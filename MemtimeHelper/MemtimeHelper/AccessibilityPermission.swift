@@ -6,11 +6,13 @@ enum AccessibilityPermission {
         AXIsProcessTrusted()
     }
 
-    /// Prompts the user to grant Accessibility permission.
-    /// Opens System Settings dialog. Does NOT block.
+    /// Prompts the user to grant Accessibility permission by opening System Settings.
+    /// Does NOT block — returns immediately. Callers must poll `isGranted` to detect
+    /// when the user grants permission.
     static func requestIfNeeded() {
         guard !isGranted else { return }
-        let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        // takeUnretainedValue() is correct: kAXTrustedCheckOptionPrompt is a +0 global constant
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 }
