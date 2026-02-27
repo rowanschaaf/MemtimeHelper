@@ -7,7 +7,7 @@ import ApplicationServices
 enum AXTreeExplorer {
     static func printClaudeTree() {
         guard let claude = NSRunningApplication.runningApplications(
-            withBundleIdentifier: "com.anthropic.claude"
+            withBundleIdentifier: "com.anthropic.claudefordesktop"
         ).first else {
             print("❌ Claude.app is not running. Launch it first, then re-run.")
             return
