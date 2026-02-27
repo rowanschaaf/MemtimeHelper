@@ -10,7 +10,9 @@
 		1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */; };
 		CC360762C6ACACAD9BB314FF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */; };
 		F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */; };
-/* End PBXBuildFile section */
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* AccessibilityPermissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* AccessibilityPermissionTests.swift */; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* AccessibilityPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* AccessibilityPermission.swift */; };
+		/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		F40AAC5295D52CFDCA477F6A /* PBXContainerItemProxy */ = {
@@ -30,7 +32,9 @@
 		8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemtimeHelperApp.swift; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* AccessibilityPermissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionTests.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* AccessibilityPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermission.swift; sourceTree = "<group>"; };
+		/* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		1D8FAA5C8D7570222D2E42AA /* Products */ = {
@@ -54,6 +58,7 @@
 		B3D34ED8FE8B47825395A7A6 /* MemtimeHelperTests */ = {
 			isa = PBXGroup;
 			children = (
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* AccessibilityPermissionTests.swift */,
 			);
 			path = MemtimeHelperTests;
 			sourceTree = "<group>";
@@ -61,6 +66,7 @@
 		B4AFA8AACBB1DA281EE60F1A /* MemtimeHelper */ = {
 			isa = PBXGroup;
 			children = (
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* AccessibilityPermission.swift */,
 				9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */,
 				2B6EB5E712433CD845DEB9D4 /* Info.plist */,
 				0913B608D58ADE3B526D5098 /* MemtimeHelper.entitlements */,
@@ -150,13 +156,15 @@
 				CC360762C6ACACAD9BB314FF /* AppDelegate.swift in Sources */,
 				1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */,
 				F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */,
-			);
+			
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* AccessibilityPermission.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B5F267EBF74B9BBF1324FD5F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* AccessibilityPermissionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,6 +184,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -313,6 +322,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
