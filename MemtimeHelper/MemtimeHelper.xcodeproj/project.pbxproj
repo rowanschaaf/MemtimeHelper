@@ -8,9 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */; };
+		263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */; };
 		7084BAB18D6530F3364F2354 /* AXTreeExplorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C3C0271195168EF9F57AFA /* AXTreeExplorer.swift */; };
 		744BC67DE727240D2F52009F /* AccessibilityPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0A059005AD56A1E0CBFAEF /* AccessibilityPermission.swift */; };
 		95CD4D7CD817DB0B2436A667 /* AccessibilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EAF1A6E590E56CE9B39B679 /* AccessibilityMonitor.swift */; };
+		98EED2FAA6551AD6EA54B189 /* WindowTitleFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */; };
 		9A73B21BC15946320DAD0A46 /* AccessibilityPermissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0D4B822A69FCDD94EDF3EE /* AccessibilityPermissionTests.swift */; };
 		CC360762C6ACACAD9BB314FF /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */; };
 		F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */; };
@@ -36,8 +38,10 @@
 		8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemtimeHelperApp.swift; sourceTree = "<group>"; };
+		C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleUpdater.swift; sourceTree = "<group>"; };
 		DA0D4B822A69FCDD94EDF3EE /* AccessibilityPermissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionTests.swift; sourceTree = "<group>"; };
 		ED0A059005AD56A1E0CBFAEF /* AccessibilityPermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermission.swift; sourceTree = "<group>"; };
+		F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleFormatterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -71,6 +75,7 @@
 			isa = PBXGroup;
 			children = (
 				DA0D4B822A69FCDD94EDF3EE /* AccessibilityPermissionTests.swift */,
+				F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */,
 			);
 			path = MemtimeHelperTests;
 			sourceTree = "<group>";
@@ -85,6 +90,7 @@
 				0913B608D58ADE3B526D5098 /* MemtimeHelper.entitlements */,
 				BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */,
 				8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */,
+				C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */,
 				41580159C9E05268F31EE419 /* Dev */,
 			);
 			path = MemtimeHelper;
@@ -173,6 +179,7 @@
 				CC360762C6ACACAD9BB314FF /* AppDelegate.swift in Sources */,
 				1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */,
 				F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */,
+				263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,6 +188,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A73B21BC15946320DAD0A46 /* AccessibilityPermissionTests.swift in Sources */,
+				98EED2FAA6551AD6EA54B189 /* WindowTitleFormatterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -200,6 +208,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -337,6 +346,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
