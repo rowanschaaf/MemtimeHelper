@@ -10,7 +10,7 @@
 		1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */; };
 		263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */; };
 		5E2EDA8A24B1F50ECB3ACC46 /* ConversationTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D77A875C80A0AC9CC0D27D9 /* ConversationTrackerTests.swift */; };
-		7084BAB18D6530F3364F2354 /* AXTreeExplorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C3C0271195168EF9F57AFA /* AXTreeExplorer.swift */; };
+		6F283F200AE1C5FAEF15EB69 /* WorkspaceObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B431B4875BDEBCF259F22CE4 /* WorkspaceObserver.swift */; };
 		744BC67DE727240D2F52009F /* AccessibilityPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0A059005AD56A1E0CBFAEF /* AccessibilityPermission.swift */; };
 		95CD4D7CD817DB0B2436A667 /* AccessibilityMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EAF1A6E590E56CE9B39B679 /* AccessibilityMonitor.swift */; };
 		98EED2FAA6551AD6EA54B189 /* WindowTitleFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */; };
@@ -36,11 +36,11 @@
 		0A471816953A337EBCA98B2F /* MemtimeHelperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MemtimeHelperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2B6EB5E712433CD845DEB9D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3EAF1A6E590E56CE9B39B679 /* AccessibilityMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityMonitor.swift; sourceTree = "<group>"; };
-		63C3C0271195168EF9F57AFA /* AXTreeExplorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXTreeExplorer.swift; sourceTree = "<group>"; };
 		8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		9911FB9337D6A3C89A2130D5 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9D77A875C80A0AC9CC0D27D9 /* ConversationTrackerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationTrackerTests.swift; sourceTree = "<group>"; };
 		AC37A4E49C23319271E0BF05 /* ConversationTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationTracker.swift; sourceTree = "<group>"; };
+		B431B4875BDEBCF259F22CE4 /* WorkspaceObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceObserver.swift; sourceTree = "<group>"; };
 		BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemtimeHelperApp.swift; sourceTree = "<group>"; };
 		C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTitleUpdater.swift; sourceTree = "<group>"; };
 		DA0D4B822A69FCDD94EDF3EE /* AccessibilityPermissionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionTests.swift; sourceTree = "<group>"; };
@@ -67,14 +67,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		41580159C9E05268F31EE419 /* Dev */ = {
-			isa = PBXGroup;
-			children = (
-				63C3C0271195168EF9F57AFA /* AXTreeExplorer.swift */,
-			);
-			path = Dev;
-			sourceTree = "<group>";
-		};
 		B3D34ED8FE8B47825395A7A6 /* MemtimeHelperTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -97,7 +89,7 @@
 				BC921196B6FF027F713D3ABA /* MemtimeHelperApp.swift */,
 				8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */,
 				C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */,
-				41580159C9E05268F31EE419 /* Dev */,
+				B431B4875BDEBCF259F22CE4 /* WorkspaceObserver.swift */,
 			);
 			path = MemtimeHelper;
 			sourceTree = "<group>";
@@ -179,7 +171,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7084BAB18D6530F3364F2354 /* AXTreeExplorer.swift in Sources */,
 				95CD4D7CD817DB0B2436A667 /* AccessibilityMonitor.swift in Sources */,
 				744BC67DE727240D2F52009F /* AccessibilityPermission.swift in Sources */,
 				CC360762C6ACACAD9BB314FF /* AppDelegate.swift in Sources */,
@@ -187,6 +178,7 @@
 				1F9E3EC9567F7B057B394108 /* MemtimeHelperApp.swift in Sources */,
 				F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */,
 				263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */,
+				6F283F200AE1C5FAEF15EB69 /* WorkspaceObserver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
