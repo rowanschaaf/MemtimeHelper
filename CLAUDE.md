@@ -36,7 +36,6 @@ MemtimeHelper/              ← Xcode project root
     WorkspaceObserver.swift        ← NSWorkspace notifications + 1s polling loop (Task 8)
     AppState.swift                 ← Observable status for menu bar (Task 9)
     MenuBarView.swift              ← Menu bar UI (Task 9)
-    Dev/AXTreeExplorer.swift       ← DEV ONLY — delete before shipping (Task 8)
   MemtimeHelperTests/       ← XCTest unit tests
 docs/plans/                 ← Design doc and implementation plan
 ```
@@ -49,18 +48,28 @@ docs/plans/                 ← Design doc and implementation plan
 
 **Accessibility permission:** Requires Privacy & Security → Accessibility permission. Without it, `AXIsProcessTrusted()` returns false and all AX calls silently fail — no errors, just `nil` results.
 
-**Dev utility:** `Dev/AXTreeExplorer.swift` and the `AppDelegate` call to `AXTreeExplorer.printClaudeTree()` are temporary. Both must be deleted in Task 8.
-
 **CF ownership:** Use `takeUnretainedValue()` (not `takeRetainedValue()`) for `kAXTrustedCheckOptionPrompt` — it is a `+0` global constant.
+
+**Bundle ID:** Claude.app bundle identifier is `com.anthropic.claudefordesktop` (NOT `com.anthropic.claude`). Stored as file-level `let claudeBundleID` in `WorkspaceObserver.swift`.
+
+**Reactive menu bar icon:** `AppDelegate` conforms to `ObservableObject` and forwards `appState.objectWillChange` via Combine so `MenuBarExtra`'s `systemImage` updates reactively.
+
+**AX tree discovery:** Claude's conversation title is exposed as an `AXButton` with the conversation name as its title, positioned immediately before the `AXButton` with title `"Preview"` in Claude's toolbar.
 
 ## Current State
 
-Implementation in progress (subagent-driven, Tasks 1–11).
+Tasks 1–10 complete. Pending Task 11 (end-to-end smoke test — requires manual verification).
 
 - ✅ Task 1: Xcode project scaffolded via xcodegen
 - ✅ Task 2: Info.plist + entitlements configured
 - ✅ Task 3: AccessibilityPermission checker + tests
-- ⏸ Task 4: AX tree explorer built — **waiting for user to run app, examine Claude.app's AX tree console output, and report which element contains the conversation title**
-- ⬜ Tasks 5–11: pending Task 4 output
+- ✅ Task 4: AX tree explorer (deleted after use — bundle ID + tree structure confirmed)
+- ✅ Task 5: AccessibilityMonitor — reads conversation title from Claude's AX tree
+- ✅ Task 6: WindowTitleUpdater — sets Claude window title via AX then AppleScript fallback
+- ✅ Task 7: ConversationTracker — change detection with debounce
+- ✅ Task 8: WorkspaceObserver — NSWorkspace notifications + 1s polling loop
+- ✅ Task 9: AppState + MenuBarView — reactive menu bar status UI
+- ✅ Task 10: AppDelegate — full wiring, login item, permission guard
+- ⏸ Task 11: End-to-end smoke test — run app, grant Accessibility, open named Claude conversation, verify Memtime captures "Claude • {title}"
 
 Full plan: `docs/plans/2026-02-27-memtime-helper.md`
