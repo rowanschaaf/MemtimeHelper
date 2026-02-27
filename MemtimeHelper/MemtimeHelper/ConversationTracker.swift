@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 final class ConversationTracker {
-    var lastTitle: String?
+    private var lastTitle: String?
 
     func hasChanged(from newTitle: String?) -> Bool {
         lastTitle != newTitle

@@ -5,37 +5,37 @@ import XCTest
 final class ConversationTrackerTests: XCTestCase {
     func test_hasChanged_returnsTrueWhenTitleDiffers() {
         let tracker = ConversationTracker()
-        tracker.lastTitle = "old title"
+        tracker.record("old title")
         XCTAssertTrue(tracker.hasChanged(from: "new title"))
     }
 
     func test_hasChanged_returnsFalseWhenTitleSame() {
         let tracker = ConversationTracker()
-        tracker.lastTitle = "same title"
+        tracker.record("same title")
         XCTAssertFalse(tracker.hasChanged(from: "same title"))
     }
 
     func test_hasChanged_returnsTrueFromNilToNonNil() {
         let tracker = ConversationTracker()
-        tracker.lastTitle = nil
+        // lastTitle is nil by default
         XCTAssertTrue(tracker.hasChanged(from: "new title"))
     }
 
     func test_hasChanged_returnsFalseWhenBothNil() {
         let tracker = ConversationTracker()
-        tracker.lastTitle = nil
+        // lastTitle is nil by default
         XCTAssertFalse(tracker.hasChanged(from: nil))
     }
 
-    func test_record_updatesLastTitle() {
+    func test_record_updatesTrackedTitle() {
         let tracker = ConversationTracker()
         tracker.record("my project: task")
-        XCTAssertEqual(tracker.lastTitle, "my project: task")
+        XCTAssertFalse(tracker.hasChanged(from: "my project: task"))
     }
 
     func test_hasChanged_returnsTrueFromNonNilToNil() {
         let tracker = ConversationTracker()
-        tracker.lastTitle = "some title"
+        tracker.record("some title")
         XCTAssertTrue(tracker.hasChanged(from: nil))
     }
 }

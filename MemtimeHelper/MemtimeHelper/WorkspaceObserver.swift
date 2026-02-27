@@ -2,6 +2,8 @@ import AppKit
 import ApplicationServices
 import os
 
+let claudeBundleID = "com.anthropic.claudefordesktop"
+
 private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", category: "WorkspaceObserver")
 
 /// Monitors for Claude.app becoming frontmost and drives the 1-second polling loop.
@@ -11,7 +13,6 @@ final class WorkspaceObserver {
     private let updater = WindowTitleUpdater()
     private let tracker = ConversationTracker()
     private var timer: Timer?
-    private let claudeBundleID = "com.anthropic.claudefordesktop"
 
     var onTitleChange: ((String?) -> Void)?
 
@@ -59,9 +60,8 @@ final class WorkspaceObserver {
     private func startPolling(pid: pid_t) {
         stopPolling()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.poll(pid: pid)
-            }
+            guard let self else { return }
+            MainActor.assumeIsolated { self.poll(pid: pid) }
         }
         poll(pid: pid) // fire immediately
     }
