@@ -1,0 +1,37 @@
+name: MemtimeHelper
+options:
+  bundleIdPrefix: com.memtimehelper
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+targets:
+  MemtimeHelper:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: MemtimeHelper
+        excludes:
+          - "**/*Tests*"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.memtimehelper.MemtimeHelper
+        SWIFT_VERSION: 5.9
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        INFOPLIST_FILE: MemtimeHelper/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+    entitlements:
+      path: MemtimeHelper/MemtimeHelper.entitlements
+  MemtimeHelperTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - MemtimeHelperTests
+    dependencies:
+      - target: MemtimeHelper
+    settings:
+      base:
+        SWIFT_VERSION: 5.9
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
