@@ -1,5 +1,8 @@
 import Cocoa
-import ApplicationServices.HIServices
+import ApplicationServices
+import os
+
+private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", category: "WindowTitleUpdater")
 
 final class WindowTitleUpdater {
     // MARK: - Title Formatting
@@ -16,8 +19,10 @@ final class WindowTitleUpdater {
     @discardableResult
     func update(pid: pid_t, conversationTitle: String?) -> Bool {
         let newTitle = Self.formatTitle(conversationTitle)
-        return setViaAccessibility(pid: pid, title: newTitle)
-            || setViaAppleScript(title: newTitle)
+        if setViaAccessibility(pid: pid, title: newTitle) { return true }
+        if setViaAppleScript(title: newTitle) { return true }
+        logger.warning("Failed to update Claude window title via both AX and AppleScript")
+        return false
     }
 
     // MARK: - Private
@@ -34,8 +39,10 @@ final class WindowTitleUpdater {
     }
 
     private func setViaAppleScript(title: String) -> Bool {
-        // Escape double quotes to prevent AppleScript injection
-        let safeTitle = title.replacingOccurrences(of: "\"", with: "'")
+        // Escape double quotes to prevent breaking out of the AppleScript string literal.
+        // Conversation titles come from Claude's own AX tree (trusted source), but we
+        // sanitise defensively since the title is interpolated into a script string.
+        let safeTitle = title.replacingOccurrences(of: "\"", with: "\\\"")
         let script = """
         tell application "System Events"
             tell process "Claude"
@@ -45,6 +52,7 @@ final class WindowTitleUpdater {
         """
         var error: NSDictionary?
         NSAppleScript(source: script)?.executeAndReturnError(&error)
+        if let error { logger.debug("AppleScript error: \(error)") }
         return error == nil
     }
 }

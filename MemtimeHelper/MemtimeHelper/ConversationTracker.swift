@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 final class ConversationTracker {
     var lastTitle: String?
 

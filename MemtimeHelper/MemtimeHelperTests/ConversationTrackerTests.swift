@@ -1,6 +1,7 @@
 import XCTest
 @testable import MemtimeHelper
 
+@MainActor
 final class ConversationTrackerTests: XCTestCase {
     func test_hasChanged_returnsTrueWhenTitleDiffers() {
         let tracker = ConversationTracker()
@@ -30,5 +31,11 @@ final class ConversationTrackerTests: XCTestCase {
         let tracker = ConversationTracker()
         tracker.record("my project: task")
         XCTAssertEqual(tracker.lastTitle, "my project: task")
+    }
+
+    func test_hasChanged_returnsTrueFromNonNilToNil() {
+        let tracker = ConversationTracker()
+        tracker.lastTitle = "some title"
+        XCTAssertTrue(tracker.hasChanged(from: nil))
     }
 }

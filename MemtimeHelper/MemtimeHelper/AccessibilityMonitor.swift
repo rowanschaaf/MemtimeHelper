@@ -11,12 +11,14 @@ final class AccessibilityMonitor {
               let windows = windowsRef as? [AXUIElement],
               let window = windows.first else { return nil }
 
-        return findConversationTitle(in: window)
+        return findConversationTitle(in: window, depth: 0)
     }
 
     // MARK: - Private
 
-    private func findConversationTitle(in element: AXUIElement) -> String? {
+    private func findConversationTitle(in element: AXUIElement, depth: Int) -> String? {
+        guard depth <= 30 else { return nil }
+
         var roleRef: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
         let role = roleRef as? String ?? ""
@@ -41,7 +43,7 @@ final class AccessibilityMonitor {
               let children = childrenRef as? [AXUIElement] else { return nil }
 
         for child in children {
-            if let found = findConversationTitle(in: child) {
+            if let found = findConversationTitle(in: child, depth: depth + 1) {
                 return found
             }
         }
@@ -50,36 +52,32 @@ final class AccessibilityMonitor {
 
     /// Returns the title of the AXButton immediately before the given element among its parent's children.
     private func previousSiblingTitle(of element: AXUIElement) -> String? {
-        // Get parent
         var parentRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &parentRef) == .success else {
-            return nil
-        }
-        let parent = parentRef as! AXUIElement
+        // Guard on .success ensures parentRef is non-nil and is a valid AXUIElement;
+        // AXUIElement is a CF type so conditional cast always succeeds — use force-cast
+        // behind the success guard, which is the safe and idiomatic pattern here.
+        guard AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &parentRef) == .success,
+              parentRef != nil else { return nil }
+        let parent = parentRef! as! AXUIElement // swiftlint:disable:this force_cast
 
-        // Get all siblings
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(parent, kAXChildrenAttribute as CFString, &childrenRef) == .success,
               let children = childrenRef as? [AXUIElement] else { return nil }
 
-        // Find our position in the sibling list
         for (index, child) in children.enumerated() {
-            guard index > 0 else { continue }
+            guard index > 0, CFEqual(child, element) else { continue }
 
-            // Use CFEqual to compare AXUIElements
-            if CFEqual(child, element) {
-                let previous = children[index - 1]
-                var prevRoleRef: CFTypeRef?
-                var prevTitleRef: CFTypeRef?
-                AXUIElementCopyAttributeValue(previous, kAXRoleAttribute as CFString, &prevRoleRef)
-                AXUIElementCopyAttributeValue(previous, kAXTitleAttribute as CFString, &prevTitleRef)
+            let previous = children[index - 1]
+            var prevRoleRef: CFTypeRef?
+            var prevTitleRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(previous, kAXRoleAttribute as CFString, &prevRoleRef)
+            AXUIElementCopyAttributeValue(previous, kAXTitleAttribute as CFString, &prevTitleRef)
 
-                guard prevRoleRef as? String == "AXButton",
-                      let prevTitle = prevTitleRef as? String,
-                      !prevTitle.isEmpty else { return nil }
+            guard prevRoleRef as? String == "AXButton",
+                  let prevTitle = prevTitleRef as? String,
+                  !prevTitle.isEmpty else { return nil }
 
-                return prevTitle
-            }
+            return prevTitle
         }
         return nil
     }
