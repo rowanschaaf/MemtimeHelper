@@ -19,8 +19,9 @@ targets:
         SWIFT_VERSION: 5.9
         MACOSX_DEPLOYMENT_TARGET: "13.0"
         INFOPLIST_FILE: MemtimeHelper/Info.plist
-        CODE_SIGN_STYLE: Automatic
-        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: R6HLD92UQ4
+        CODE_SIGN_IDENTITY: AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1
     entitlements:
       path: MemtimeHelper/MemtimeHelper.entitlements
   MemtimeHelperTests:
@@ -36,3 +37,6 @@ targets:
         SWIFT_VERSION: 5.9
         MACOSX_DEPLOYMENT_TARGET: "13.0"
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: R6HLD92UQ4
+        CODE_SIGN_IDENTITY: AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1

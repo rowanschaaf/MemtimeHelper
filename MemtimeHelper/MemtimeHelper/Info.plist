@@ -9,7 +9,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>MemtimeHelper</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
@@ -21,7 +21,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSAccessibilityUsageDescription</key>
-    <string>MemtimeHelper needs Accessibility access to read Claude's active conversation title for time tracking.</string>
+    <string>MemtimeHelper needs Accessibility access to read context from Claude and Outlook for time tracking.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>MemtimeHelper uses AppleScript as a fallback to update Claude's window title for time tracking.</string>
     <key>NSPrincipalClass</key>

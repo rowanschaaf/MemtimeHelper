@@ -8,12 +8,15 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let appState = AppState()
-    private let observer = WorkspaceObserver()
+    private let observer = WorkspaceObserver(monitors: [
+        ClaudeMonitor(),
+        OutlookMonitor()
+    ])
     private var cancellables = Set<AnyCancellable>()
+    private var permissionTimer: Timer?
 
     override init() {
         super.init()
-        // Forward AppState's objectWillChange so SwiftUI re-renders the MenuBarExtra icon.
         appState.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
@@ -21,50 +24,55 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-
         registerLoginItemIfNeeded()
 
-        guard AccessibilityPermission.isGranted else {
+        if AccessibilityPermission.isGranted {
+            logger.notice("AX permission granted — starting observer")
+            startObserver()
+        } else {
+            logger.notice("AX permission not granted — waiting")
             appState.setPermissionError()
             AccessibilityPermission.requestIfNeeded()
-            return
+            startPermissionPolling()
         }
-
-        observer.onTitleChange = { [weak self] title in
-            self?.appState.setActive(conversationTitle: title)
-        }
-
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self,
-            selector: #selector(claudeTerminated(_:)),
-            name: NSWorkspace.didTerminateApplicationNotification,
-            object: nil
-        )
-
-        observer.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        permissionTimer?.invalidate()
         observer.stop()
     }
 
     // MARK: - Private
 
+    private func startPermissionPolling() {
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                if AccessibilityPermission.isGranted {
+                    logger.notice("Permission granted mid-flight — starting observer")
+                    self.permissionTimer?.invalidate()
+                    self.permissionTimer = nil
+                    self.startObserver()
+                }
+            }
+        }
+    }
+
+    private func startObserver() {
+        observer.onTitleChange = { [weak self] bundleID, title in
+            self?.appState.setActive(bundleID: bundleID, title: title)
+        }
+        observer.start()
+    }
+
     private func registerLoginItemIfNeeded() {
         do {
             if SMAppService.mainApp.status == .notRegistered {
                 try SMAppService.mainApp.register()
-                logger.info("Registered as login item")
+                logger.notice("Registered as login item")
             }
         } catch {
             logger.error("Failed to register login item: \(error)")
         }
-    }
-
-    @objc private func claudeTerminated(_ notification: Notification) {
-        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.bundleIdentifier == claudeBundleID else { return }
-        logger.debug("Claude terminated")
-        appState.setWaiting()
     }
 }
