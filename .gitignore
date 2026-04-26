@@ -26,3 +26,10 @@ Package.resolved
 # AX tree dumps written by AXTreeDumper to ~/Desktop are outside the repo;
 # this guards against accidental in-tree drops.
 ax-tree-*.txt
+
+# Code coverage / profiling artefacts
+*.profraw
+
+# Local AX exploration scratch files
+explore-ax-*
+explore-outlook-ax*
