@@ -1,6 +1,8 @@
 # MemtimeHelper
 
-Swift macOS background menu bar app (no Dock icon) that reads Claude.app's active conversation title via the macOS Accessibility API and updates Claude.app's window title to `"Claude • {conversationTitle}"` so Memtime captures project context automatically.
+Swift macOS menu-bar app (no Dock icon) that reads conversation/email titles from monitored apps via the macOS Accessibility API and writes them directly into Memtime's local SQLite database — so Memtime tracks time per *conversation* (Claude) or *thread* (Outlook), not per app.
+
+User-facing overview lives in [README.md](README.md). This file is for working in the codebase.
 
 ## Commands
 
@@ -19,26 +21,42 @@ open MemtimeHelper/MemtimeHelper.xcodeproj
 
 # Verify Claude.app bundle ID
 osascript -e 'id of app "Claude"'
+
+# Inspect Memtime's DB (rows are unix-seconds timestamps)
+sqlite3 "$HOME/Library/Application Support/memtime/user/core.db" \
+  "SELECT id, title, datetime(start,'unixepoch','localtime'), datetime(end,'unixepoch','localtime') \
+   FROM TTracking WHERE program='com.anthropic.claudefordesktop' ORDER BY start DESC LIMIT 10;"
 ```
 
 ## Architecture
 
 ```
-MemtimeHelper/              ← Xcode project root
-  project.yml               ← xcodegen spec — edit this, not the .xcodeproj directly
-  MemtimeHelper/            ← App source
-    MemtimeHelperApp.swift  ← @main, MenuBarExtra scene (no WindowGroup)
-    AppDelegate.swift       ← Lifecycle, login item registration, starts WorkspaceObserver
-    AccessibilityPermission.swift  ← AXIsProcessTrusted wrapper
-    AccessibilityMonitor.swift     ← Reads conversation title from Claude's AX tree (Task 5)
-    WindowTitleUpdater.swift       ← Sets Claude's window title via AX/AppleScript (Task 6)
-    ConversationTracker.swift      ← Change detection / debounce (Task 7)
-    WorkspaceObserver.swift        ← NSWorkspace notifications + 1s polling loop (Task 8)
-    AppState.swift                 ← Observable status for menu bar (Task 9)
-    MenuBarView.swift              ← Menu bar UI (Task 9)
-  MemtimeHelperTests/       ← XCTest unit tests
-docs/plans/                 ← Design doc and implementation plan
+MemtimeHelper/                    ← Xcode project root
+  project.yml                     ← xcodegen spec — edit this, NOT the .xcodeproj
+  MemtimeHelper/                  ← App source
+    MemtimeHelperApp.swift        ← @main, MenuBarExtra scene
+    AppDelegate.swift             ← Lifecycle, login item, starts WorkspaceObserver
+    AccessibilityPermission.swift ← AXIsProcessTrusted wrapper
+
+    AppMonitor.swift              ← Protocol all monitored apps conform to
+    ClaudeMonitor.swift           ← Reads Claude conversation title from AX tree
+    OutlookMonitor.swift          ← Reads Outlook email subject from AX tree
+    OutlookContext.swift          ← Outlook-specific helpers
+
+    WorkspaceObserver.swift       ← NSWorkspace notifications + 1s poll loop;
+                                    decides UPDATE vs splitSegment per app
+    ConversationTracker.swift     ← Per-app change detection (menu bar UX)
+    WindowTitleUpdater.swift      ← SQLite writer; UPDATE / atomic split / recency filter
+
+    AXTreeDumper.swift            ← Diagnostic; menu item dumps full AX tree to ~/Desktop
+
+    AppState.swift                ← Observable status for menu bar
+    MenuBarView.swift             ← Menu bar UI
+  MemtimeHelperTests/             ← XCTest unit tests
+docs/plans/                       ← Design + implementation notes
 ```
+
+Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for:)`. If non-nil, it either `update`s the open `TTracking` row's title or — when the title differs from the last write — calls `splitSegment` to atomically close the open row and insert a fresh one with the new title.
 
 ## Gotchas
 
@@ -50,26 +68,22 @@ docs/plans/                 ← Design doc and implementation plan
 
 **CF ownership:** Use `takeUnretainedValue()` (not `takeRetainedValue()`) for `kAXTrustedCheckOptionPrompt` — it is a `+0` global constant.
 
-**Bundle ID:** Claude.app bundle identifier is `com.anthropic.claudefordesktop` (NOT `com.anthropic.claude`). Stored as file-level `let claudeBundleID` in `WorkspaceObserver.swift`.
+**Bundle ID:** Claude.app bundle identifier is `com.anthropic.claudefordesktop` (NOT `com.anthropic.claude`).
+
+**Enhanced AX every poll:** `ClaudeMonitor` re-sends `AXEnhancedUserInterface` and `AXManualAccessibility` on the application AX element on every call. Setting these once per pid (the previous approach) routinely produced stub trees and persistent nil reads when Claude backgrounded or window state churned. Don't reintroduce a one-shot guard.
+
+**Don't write on nil:** `WorkspaceObserver` skips DB writes when a monitor returns nil. A nil read is almost always a transient AX hiccup (backgrounded window, mid-transition). Writing the bare app name as fallback overwrites the last good title and segments cleanly into garbage.
+
+**Recency filter on every SQL:** Memtime's DB accumulates `end IS NULL` orphans from past crashes going back years. Every statement in `WindowTitleUpdater` filters open rows to `start > now - 3600`. Without this, polls silently mutate ancient rows. Do not remove.
+
+**Atomic split + no phantom inserts:** `splitSegment` wraps close+insert in `BEGIN IMMEDIATE`. If the close affected zero rows (Memtime hasn't opened a recent row for this app), the insert is skipped — we never materialise tracking rows Memtime didn't authorise.
+
+**AX anchor for Claude:** Each conversation pane has the shape `[AXPopUpButton title="{project}", AXButton title="{conversation}", AXPopUpButton desc="Session actions"]` as siblings under one AXGroup. The "Session actions" popup is the unique anchor; the title is its preceding AXButton sibling. The launcher home pane (no conversation) lacks the "Session actions" popup, so panes without a real conversation are correctly ignored. With multiple panes, the one containing `kAXFocusedUIElementAttribute` wins. See `AXTreeDumper.swift` if Claude's tree changes — re-dump and pick a new anchor.
 
 **Reactive menu bar icon:** `AppDelegate` conforms to `ObservableObject` and forwards `appState.objectWillChange` via Combine so `MenuBarExtra`'s `systemImage` updates reactively.
 
-**AX tree discovery:** Claude's conversation title is exposed as an `AXButton` with the conversation name as its title, positioned immediately before the `AXButton` with title `"Preview"` in Claude's toolbar.
+## Status
 
-## Current State
+Working end-to-end. Tracks Claude conversations and Outlook threads with per-segment time blocks in Memtime.
 
-Tasks 1–10 complete. Pending Task 11 (end-to-end smoke test — requires manual verification).
-
-- ✅ Task 1: Xcode project scaffolded via xcodegen
-- ✅ Task 2: Info.plist + entitlements configured
-- ✅ Task 3: AccessibilityPermission checker + tests
-- ✅ Task 4: AX tree explorer (deleted after use — bundle ID + tree structure confirmed)
-- ✅ Task 5: AccessibilityMonitor — reads conversation title from Claude's AX tree
-- ✅ Task 6: WindowTitleUpdater — sets Claude window title via AX then AppleScript fallback
-- ✅ Task 7: ConversationTracker — change detection with debounce
-- ✅ Task 8: WorkspaceObserver — NSWorkspace notifications + 1s polling loop
-- ✅ Task 9: AppState + MenuBarView — reactive menu bar status UI
-- ✅ Task 10: AppDelegate — full wiring, login item, permission guard
-- ⏸ Task 11: End-to-end smoke test — run app, grant Accessibility, open named Claude conversation, verify Memtime captures "Claude • {title}"
-
-Full plan: `docs/plans/2026-02-27-memtime-helper.md`
+Plans: [docs/plans/2026-02-27-memtime-helper.md](docs/plans/2026-02-27-memtime-helper.md)
