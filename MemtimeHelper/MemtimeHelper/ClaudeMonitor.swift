@@ -8,150 +8,149 @@ final class ClaudeMonitor: AppMonitor {
     let bundleID = "com.anthropic.claudefordesktop"
     let appDisplayName = "Claude"
 
-    private var hasRequestedEnhancedAX = false
-
     func currentTitle(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)
 
-        // Ask Chromium/Electron to expose its full accessibility tree. Without
-        // this handshake, Claude only exposes a stub tree to background AX
-        // clients. `AXEnhancedUserInterface` is the historical VoiceOver signal;
-        // `AXManualAccessibility` is Chromium's opt-in. Both set defensively.
-        if !hasRequestedEnhancedAX {
-            AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
-            AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
-            hasRequestedEnhancedAX = true
-            logger.notice("Requested enhanced AX tree from Claude (pid=\(pid))")
-        }
+        // Re-send the Chromium/Electron enhanced-AX handshake every call.
+        // It's idempotent and cheap, and avoids the failure mode where Claude
+        // collapses its AX tree (e.g. when backgrounded or after window churn)
+        // and never re-enriches because we only set the flag once per pid.
+        AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
-        // Prefer the focused window (richer tree) and fall back to iterating
-        // all windows. Claude's AX tree is most populated when its window is
-        // focused, but we don't want to gate strictly on that.
-        var candidates: [AXUIElement] = []
-        var focusedRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &focusedRef) == .success,
-           focusedRef != nil {
-            candidates.append(focusedRef! as! AXUIElement)  // swiftlint:disable:this force_cast
+        guard let window = primaryWindow(of: app) else { return nil }
+
+        // Claude tiles conversations as panes within ONE OS-level window.
+        // Each conversation pane has this exact shape (see
+        // ax-tree-com-anthropic-claudefordesktop-20260426T224551.txt for a
+        // full dump captured 2026-04-26):
+        //
+        //   AXGroup
+        //     AXPopUpButton title="{project}"      ← project / folder
+        //     AXButton      title="{conversation}" ← THE TITLE
+        //     AXPopUpButton desc="Session actions"
+        //
+        // The "Session actions" popup is the most reliable anchor — it only
+        // appears once per real conversation pane. The launcher home (which
+        // also lives under an AXLandmarkRegion) doesn't have it, so panes
+        // without a conversation are correctly ignored.
+        var sessionActionsPopups: [AXUIElement] = []
+        collectSessionActionPopups(in: window, depth: 0, into: &sessionActionsPopups)
+        if sessionActionsPopups.isEmpty { return nil }
+
+        // With multiple conversation panes, prefer the one containing the
+        // focused UI element — that's the pane the user is actively in.
+        let chosen = pickPane(among: sessionActionsPopups, focusedElement: focusedElement(of: app))
+        return conversationTitle(for: chosen)
+    }
+
+    // MARK: - Window selection
+
+    private func primaryWindow(of app: AXUIElement) -> AXUIElement? {
+        var ref: CFTypeRef?
+        if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &ref) == .success,
+           ref != nil {
+            return (ref as! AXUIElement)  // swiftlint:disable:this force_cast
         }
         var windowsRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-           let windows = windowsRef as? [AXUIElement] {
-            for w in windows where !candidates.contains(where: { CFEqual($0, w) }) {
-                candidates.append(w)
-            }
-        }
-
-        // The primary pane holds the conversation the user is looking at. Its
-        // header has this shape (see docs/notes/claude-ax-tree.md for a sample
-        // AX dump captured 2026-04-23):
-        //
-        //   AXGroup/AXLandmarkRegion desc="Primary pane"
-        //     ...
-        //       AXPopUpButton title="{project}"     ← project switcher
-        //       AXStaticText  value="{title}"       ← current conversation title
-        //       AXPopUpButton desc="Session actions"
-        //
-        // NOTE: `AXStaticText` appears visually nested under the popup, but at
-        // the AX-API level it is a SIBLING — `AXPopUpButton` hides its children
-        // from assistive tech until opened. We therefore walk to the popup's
-        // parent and search there for the title.
-        for window in candidates {
-            guard let pane = findPrimaryPane(in: window, depth: 0) else { continue }
-            guard let popup = firstProjectPopupButton(in: pane, depth: 0) else { continue }
-            guard let title = firstStaticTextValueInParentSubtree(of: popup) else { continue }
-            let project = attrString(popup, kAXTitleAttribute as String)
-            return formatted(project: project, title: title)
+           let windows = windowsRef as? [AXUIElement], let first = windows.first {
+            return first
         }
         return nil
     }
 
-    // MARK: - Finders
-
-    /// Walks the subtree to locate the "Primary pane" AXLandmarkRegion.
-    private func findPrimaryPane(in element: AXUIElement, depth: Int) -> AXUIElement? {
-        if depth > 25 { return nil }
-        if attrString(element, kAXSubroleAttribute as String) == "AXLandmarkRegion",
-           attrString(element, kAXDescriptionAttribute as String) == "Primary pane" {
-            return element
-        }
-        var childrenRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else { return nil }
-        for child in children {
-            if let found = findPrimaryPane(in: child, depth: depth + 1) {
-                return found
-            }
-        }
-        return nil
+    private func focusedElement(of app: AXUIElement) -> AXUIElement? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &ref) == .success,
+              ref != nil else { return nil }
+        return (ref as! AXUIElement)  // swiftlint:disable:this force_cast
     }
 
-    /// The first AXPopUpButton with a non-empty title inside the primary pane
-    /// is the project switcher for the current conversation. The adjacent
-    /// "Session actions" popup only has `desc`, not `title`, so it's skipped.
-    private func firstProjectPopupButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
-        if depth > 20 { return nil }
+    // MARK: - Walking
+
+    /// Collects every `AXPopUpButton` whose description is "Session actions".
+    /// Each one anchors one conversation pane.
+    private func collectSessionActionPopups(in element: AXUIElement, depth: Int, into result: inout [AXUIElement]) {
+        if depth > 30 { return }
         if attrString(element, kAXRoleAttribute as String) == "AXPopUpButton",
-           let title = attrString(element, kAXTitleAttribute as String),
-           !title.isEmpty {
-            return element
+           attrString(element, kAXDescriptionAttribute as String) == "Session actions" {
+            result.append(element)
+            return  // No need to descend further into a popup.
         }
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else { return nil }
+              let children = childrenRef as? [AXUIElement] else { return }
         for child in children {
-            if let found = firstProjectPopupButton(in: child, depth: depth + 1) {
-                return found
+            collectSessionActionPopups(in: child, depth: depth + 1, into: &result)
+        }
+    }
+
+    /// Picks the session-actions popup belonging to the pane the user is in.
+    /// Falls back to the first one if no focused element or it's outside any pane.
+    private func pickPane(among popups: [AXUIElement], focusedElement: AXUIElement?) -> AXUIElement {
+        guard popups.count > 1, let focused = focusedElement else { return popups[0] }
+
+        // Walk up from the focused element. The first session-actions popup
+        // that shares an ancestor (specifically, the immediate parent group of
+        // the title triple) wins.
+        var node: AXUIElement? = focused
+        var depth = 0
+        while let current = node, depth < 30 {
+            for popup in popups {
+                if let popupParent = parent(of: popup), CFEqual(popupParent, current) {
+                    return popup
+                }
+                if isAncestor(current, of: popup, maxDepth: 20) {
+                    return popup
+                }
             }
+            node = parent(of: current)
+            depth += 1
         }
-        return nil
+        return popups[0]
     }
 
-    /// Walks up to the element's parent and returns the first AXStaticText value
-    /// found in that parent's subtree. This sidesteps the fact that popup
-    /// buttons hide their own children from AX.
-    private func firstStaticTextValueInParentSubtree(of element: AXUIElement) -> String? {
-        var parentRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &parentRef) == .success,
-              parentRef != nil else { return nil }
-        let parent = parentRef! as! AXUIElement  // swiftlint:disable:this force_cast
-        return firstStaticTextValue(in: parent, depth: 0)
+    private func isAncestor(_ candidate: AXUIElement, of element: AXUIElement, maxDepth: Int) -> Bool {
+        var node: AXUIElement? = parent(of: element)
+        var depth = 0
+        while let current = node, depth < maxDepth {
+            if CFEqual(current, candidate) { return true }
+            node = parent(of: current)
+            depth += 1
+        }
+        return false
     }
 
-    /// Returns the value of the first AXStaticText descendant with a non-empty value.
-    private func firstStaticTextValue(in element: AXUIElement, depth: Int) -> String? {
-        if depth > 10 { return nil }
-        if attrString(element, kAXRoleAttribute as String) == "AXStaticText",
-           let value = attrString(element, kAXValueAttribute as String),
-           !value.isEmpty {
-            return value
-        }
+    // MARK: - Title extraction
+
+    /// Reads the conversation title — the nearest preceding `AXButton` sibling
+    /// of the "Session actions" popup, with a non-empty title.
+    private func conversationTitle(for sessionActionsPopup: AXUIElement) -> String? {
+        guard let parent = parent(of: sessionActionsPopup) else { return nil }
         var childrenRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else { return nil }
-        for child in children {
-            if let found = firstStaticTextValue(in: child, depth: depth + 1) {
-                return found
+        guard AXUIElementCopyAttributeValue(parent, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+              let children = childrenRef as? [AXUIElement],
+              let idx = children.firstIndex(where: { CFEqual($0, sessionActionsPopup) }),
+              idx > 0 else { return nil }
+
+        for i in stride(from: idx - 1, through: 0, by: -1) {
+            if attrString(children[i], kAXRoleAttribute as String) == "AXButton",
+               let t = attrString(children[i], kAXTitleAttribute as String), !t.isEmpty {
+                return t
             }
         }
         return nil
-    }
-
-    // MARK: - Formatting
-
-    private func formatted(project: String?, title: String) -> String {
-        guard let rawProject = project, !rawProject.isEmpty else { return title }
-        // Strip path annotations like " · ~/Documents/..." or " · PatternNZ".
-        let cleanProject: String
-        if let dotIdx = rawProject.range(of: " · ") {
-            cleanProject = String(rawProject[..<dotIdx.lowerBound])
-        } else {
-            cleanProject = rawProject
-        }
-        if cleanProject.isEmpty || cleanProject == title { return title }
-        return "\(cleanProject): \(title)"
     }
 
     // MARK: - AX helpers
+
+    private func parent(of element: AXUIElement) -> AXUIElement? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXParentAttribute as CFString, &ref) == .success,
+              ref != nil else { return nil }
+        return (ref as! AXUIElement)  // swiftlint:disable:this force_cast
+    }
 
     private func attrString(_ element: AXUIElement, _ attr: String) -> String? {
         var r: CFTypeRef?

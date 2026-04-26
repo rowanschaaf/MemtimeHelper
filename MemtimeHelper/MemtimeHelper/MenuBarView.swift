@@ -12,6 +12,14 @@ struct MenuBarView: View {
 
             Divider()
 
+            Button("Dump Claude AX Tree…") {
+                if let path = AXTreeDumper.dump(bundleID: "com.anthropic.claudefordesktop") {
+                    NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
+                } else {
+                    NSSound.beep()
+                }
+            }
+
             Button("Quit MemtimeHelper") {
                 NSApplication.shared.terminate(nil)
             }
