@@ -124,23 +124,13 @@ final class ClaudeMonitor: AppMonitor {
 
     // MARK: - Title extraction
 
-    /// Reads the conversation title — the nearest preceding `AXButton` sibling
-    /// of the "Session actions" popup, with a non-empty title.
+    /// Reads the conversation title for the pane anchored by the given
+    /// "Session actions" popup. The title button's position relative to the
+    /// anchor changes across Claude versions, so the walk lives in
+    /// `ClaudeTitle.extract` (covered by `ClaudeTitleTests`) rather than
+    /// assuming a fixed sibling layout here.
     private func conversationTitle(for sessionActionsPopup: AXUIElement) -> String? {
-        guard let parent = parent(of: sessionActionsPopup) else { return nil }
-        var childrenRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(parent, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement],
-              let idx = children.firstIndex(where: { CFEqual($0, sessionActionsPopup) }),
-              idx > 0 else { return nil }
-
-        for i in stride(from: idx - 1, through: 0, by: -1) {
-            if attrString(children[i], kAXRoleAttribute as String) == "AXButton",
-               let t = attrString(children[i], kAXTitleAttribute as String), !t.isEmpty {
-                return t
-            }
-        }
-        return nil
+        ClaudeTitle.extract(fromAnchor: AXElementNode(element: sessionActionsPopup))
     }
 
     // MARK: - AX helpers
