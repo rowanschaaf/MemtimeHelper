@@ -41,25 +41,40 @@ struct AXElementNode: AXNode {
     }
 }
 
-/// Extracts the conversation title from a Claude pane, given the pane's
-/// "Session actions" popup as anchor.
+/// Finds the anchor of each Claude conversation pane and extracts the
+/// conversation title from it.
 ///
-/// The title is an `AXButton` with a non-empty title that lives in the pane
-/// header. Where it sits relative to the anchor has changed across Claude
-/// versions:
+/// The anchor and the title location have changed across Claude versions:
 ///
-///   - ≤ Apr 2026: a direct sibling of the popup (same parent group).
-///   - Jun 2026 (1.14271.0): in a *sibling* group one level up — the header
-///     splits into [title, toggles…, project popup] and [Terminal, Diff,
-///     Preview, Session actions].
+///   - ≤ Apr 2026: anchor is `AXPopUpButton desc="Session actions"`. The title
+///     is a titled `AXButton`, a direct sibling of the anchor.
+///   - Jun 2026 (1.14271.0): same anchor. The title button moved into a
+///     *sibling* group one level up: [title, toggles…, project popup] and
+///     [Terminal, Diff, Preview, Session actions].
+///   - Oct 2026 (2.19675.0): "Session actions" is gone. The title button has
+///     no `title`; its `desc` is "{title}, rename session". That button is
+///     the anchor, and the title comes from its own `desc`.
 ///
-/// Rather than assume a fixed sibling position, walk up from the anchor and,
-/// at each ancestor, search its subtree for the first `AXButton` with a
-/// non-empty title. This survives both layouts (and is more tolerant of the
-/// next reshuffle). Both climb and descent are depth-bounded so we never wander
-/// out of the header into chat content or the sidebar.
+/// For the "Session actions" anchor, walk up from the anchor and, at each
+/// ancestor, search its subtree for the first `AXButton` with a non-empty
+/// title. Both climb and descent are depth-bounded so we never wander out of
+/// the header into chat content or the sidebar.
+///
+/// Sidebar rows carry neither anchor. They have status-prefixed titles and
+/// "More options for {title}" popups.
 enum ClaudeTitle {
+    private static let renameSuffix = ", rename session"
+
+    static func isAnchor(_ node: AXNode) -> Bool {
+        isRenameButton(node) || (node.role == "AXPopUpButton" && node.desc == "Session actions")
+    }
+
     static func extract(fromAnchor anchor: AXNode, maxClimb: Int = 4, maxDescend: Int = 6) -> String? {
+        if isRenameButton(anchor), let desc = anchor.desc {
+            let title = String(desc.dropLast(renameSuffix.count))
+            return title.isEmpty ? nil : title
+        }
+
         var node: AXNode? = anchor.parent
         var climb = 0
         while let current = node, climb < maxClimb {
@@ -70,6 +85,10 @@ enum ClaudeTitle {
             climb += 1
         }
         return nil
+    }
+
+    private static func isRenameButton(_ node: AXNode) -> Bool {
+        node.role == "AXButton" && (node.desc?.hasSuffix(renameSuffix) ?? false)
     }
 
     private static func firstButtonTitle(in node: AXNode, maxDepth: Int) -> String? {
