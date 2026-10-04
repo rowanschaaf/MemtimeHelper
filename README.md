@@ -56,11 +56,24 @@ open MemtimeHelper.xcodeproj
 
 The first run will prompt for Accessibility permission. Without it, all AX reads return `nil` silently — nothing gets tracked.
 
+### Code signing
+
+A fresh clone builds with ad-hoc signing. This needs no developer certificate. But macOS ties the Accessibility grant to the signature, so each ad-hoc rebuild needs a new grant.
+
+To keep one grant across rebuilds, sign with your own Apple Development certificate. From the `MemtimeHelper/` directory:
+
+```bash
+cp Signing.local.xcconfig.example Signing.local.xcconfig
+```
+
+Then set `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY` in `Signing.local.xcconfig`. Git ignores this file. Use the certificate name, not its SHA-1 hash, so the configuration continues to work after you renew the certificate.
+
 ## Project structure
 
 ```
 MemtimeHelper/
   project.yml                ← xcodegen spec — edit this, NOT the .xcodeproj
+  Signing.xcconfig           ← Default (ad-hoc) signing; includes Signing.local.xcconfig if present
   MemtimeHelper/
     MemtimeHelperApp.swift   ← @main entry point, MenuBarExtra scene
     AppDelegate.swift        ← Lifecycle, login item, starts WorkspaceObserver

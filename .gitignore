@@ -33,3 +33,6 @@ ax-tree-*.txt
 # Local AX exploration scratch files
 explore-ax-*
 explore-outlook-ax*
+
+# Personal code-signing overrides (see MemtimeHelper/Signing.xcconfig)
+*.local.xcconfig

@@ -1,0 +1,11 @@
+// Default signing: ad-hoc ("Sign to Run Locally"). A fresh clone builds with
+// no developer certificate.
+//
+// To sign with your own certificate, copy Signing.local.xcconfig.example to
+// Signing.local.xcconfig. Git ignores that file. Its values override these.
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Signing.local.xcconfig"
