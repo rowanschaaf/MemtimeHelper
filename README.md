@@ -32,7 +32,7 @@ MemtimeHelper bridges the gap by reading the active conversation/email title via
 4. Nil reads (e.g., backgrounded apps with stub AX trees) deliberately *don't* overwrite — your last good title sticks.
 5. A 1-hour recency filter ensures we never mutate Memtime's stale orphan rows from past crashes.
 
-The Claude AX-tree anchor is the `AXPopUpButton desc="Session actions"` popup that appears once per real conversation pane. The conversation title is its preceding sibling `AXButton`.
+Each Claude conversation pane has one anchor element, and the title is read relative to it. Claude 2.19675.0 anchors on the title button itself (`AXButton desc="{title}, rename session"`). Older versions used an `AXPopUpButton desc="Session actions"` popup. Claude changes this layout without notice. [CLAUDE.md](CLAUDE.md) records each layout and how to re-derive the anchor.
 
 ## Requirements
 
