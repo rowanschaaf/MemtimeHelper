@@ -16,15 +16,25 @@ final class WorkspaceObserver {
     /// close the open row and insert a new one so time is segmented per
     /// conversation rather than rolled into one Claude block.
     private var lastWrittenTitles: [String: String] = [:]
+    /// Silent-breakage detection, for monitors that opt in via
+    /// `expectsTitleWhenFrontmost`.
+    private var health: [String: TitleHealth] = [:]
     private var timer: Timer?
 
     /// Called when any monitored app's title changes. Parameters: (bundleID, title).
     var onTitleChange: ((String, String?) -> Void)?
 
+    /// Called when a monitor's title health alerts or recovers.
+    var onHealthEvent: ((AppMonitor, TitleHealth.Event) -> Void)?
+
     init(monitors: [AppMonitor]) {
         self.monitors = monitors
+        let threshold = TitleHealth.configuredThreshold()
         for m in monitors {
             trackers[m.bundleID] = ConversationTracker()
+            if m.expectsTitleWhenFrontmost {
+                health[m.bundleID] = TitleHealth(threshold: threshold)
+            }
         }
     }
 
@@ -119,6 +129,8 @@ final class WorkspaceObserver {
                 logger.notice("poll #\(self.pollCount) \(monitor.appDisplayName, privacy: .public): \(title ?? "nil", privacy: .public)")
             }
 
+            recordHealth(for: monitor, title: title)
+
             // Only write when we have a real title. A nil read (typically a
             // backgrounded window with a stub AX tree) must not clobber the
             // last-good title — Memtime would just show the bare app name.
@@ -144,5 +156,20 @@ final class WorkspaceObserver {
             logger.notice("\(monitor.appDisplayName, privacy: .public) title changed to: \(title ?? "nil", privacy: .public)")
             onTitleChange?(monitor.bundleID, title)
         }
+    }
+
+    private func recordHealth(for monitor: AppMonitor, title: String?) {
+        guard health[monitor.bundleID] != nil else { return }
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == monitor.bundleID
+        guard let event = health[monitor.bundleID]?.record(title: title, frontmost: frontmost, at: Date()) else { return }
+
+        switch event {
+        case .alert:
+            let seconds = Int(health[monitor.bundleID]?.threshold ?? 0)
+            logger.error("\(monitor.appDisplayName, privacy: .public) title health: no title read in \(seconds) s of frontmost use — AX layout may have changed")
+        case .recovered:
+            logger.notice("\(monitor.appDisplayName, privacy: .public) title health: recovered")
+        }
+        onHealthEvent?(monitor, event)
     }
 }

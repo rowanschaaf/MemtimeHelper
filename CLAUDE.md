@@ -46,6 +46,8 @@ MemtimeHelper/                    ← Xcode project root
     WorkspaceObserver.swift       ← NSWorkspace notifications + 1s poll loop;
                                     decides UPDATE vs splitSegment per app
     ConversationTracker.swift     ← Per-app change detection (menu bar UX)
+    TitleHealth.swift             ← Silent-breakage detector (frontmost time
+                                    without a title → alert)
     WindowTitleUpdater.swift      ← SQLite writer; UPDATE / atomic split / recency filter
 
     AXTreeDumper.swift            ← Diagnostic; menu item dumps full AX tree to ~/Desktop
@@ -86,6 +88,8 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 - 2.19675.0 (dumped 2026-10-04): "Session actions" is gone. The header is `[Remote Control, AXButton desc="{conversation}, rename session", AXPopUpButton desc="More options for {conversation}", AXPopUpButton title="{project}"]` and `[Terminal, Changes, Browser, View options, Close split view]`. The title button has no `title` attribute. Memtime logged bare "Claude" from 2026-09-07 to 2026-10-05 (46 h). The Claude version that first made this change is not known; no dump exists between June and October.
 
 `ClaudeTitle.extract` handles both anchors. For the rename button, the title is its `desc` without the ", rename session" suffix. For "Session actions", it walks *up* from the anchor and, at each ancestor, searches the subtree for the first titled `AXButton` (climb and descent are depth-bounded to stay inside the header). It is pure and unit-tested via the `AXNode` protocol: see `ClaudeTitleTests`. Add a case there when the tree shifts again. If it breaks again, run `AXTreeDumper` (menu bar → "Dump Claude AX Tree…", writes to ~/Desktop), diff against the dumps, and add the new shape to `isAnchor`/`extract`. Do not commit dumps: they contain real session titles. Do not use the `AXWebArea` title as a source. It was "Claude" in every dump before 2.19675.0.
+
+**Title health signal:** Title extraction broke silently twice, and both times nothing reported it for weeks. `TitleHealth` counts cumulative *frontmost* time with nil reads, and any successful read resets it. At 600 s, `WorkspaceObserver` logs an `.error` line and `AppDelegate` sets the menu bar triangle and posts a notification. The notification repeats at most once per calendar day while the app stays degraded. Background time never counts, because a backgrounded Claude returns stub trees. A poll gap adds 5 s at most, so wake from sleep does not count. Only monitors with `expectsTitleWhenFrontmost == true` take part (Claude yes, Outlook no: Calendar and compose views have no reading pane). To test it live, shorten the threshold with `defaults write com.memtimehelper.MemtimeHelper TitleHealthThresholdSeconds -int 20`, then relaunch. Delete the key afterwards.
 
 **Reactive menu bar icon:** `AppDelegate` conforms to `ObservableObject` and forwards `appState.objectWillChange` via Combine so `MenuBarExtra`'s `systemImage` updates reactively.
 

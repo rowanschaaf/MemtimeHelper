@@ -7,6 +7,9 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 final class ClaudeMonitor: AppMonitor {
     let bundleID = "com.anthropic.claudefordesktop"
     let appDisplayName = "Claude"
+    // Every frontmost Claude view except the launcher shows a conversation
+    // pane, so a long run of nil reads means the AX layout has changed.
+    let expectsTitleWhenFrontmost = true
 
     func currentTitle(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)

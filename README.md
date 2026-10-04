@@ -31,6 +31,7 @@ MemtimeHelper bridges the gap by reading the active conversation/email title via
 3. When the title *changes* mid-session, the current row is closed and a new one inserted — atomically, in a `BEGIN IMMEDIATE` transaction so Memtime can't slip a row in between.
 4. Nil reads (e.g., backgrounded apps with stub AX trees) deliberately *don't* overwrite — your last good title sticks.
 5. A 1-hour recency filter ensures we never mutate Memtime's stale orphan rows from past crashes.
+6. If Claude is frontmost for 10 minutes in total with no title read, the menu bar icon changes to a warning triangle and a notification appears, at most once a day. This usually means Claude changed its window layout. Use **Dump Claude AX Tree…** to capture the new layout.
 
 Each Claude conversation pane has one anchor element, and the title is read relative to it. Claude 2.19675.0 anchors on the title button itself (`AXButton desc="{title}, rename session"`). Older versions used an `AXPopUpButton desc="Session actions"` popup. Claude changes this layout without notice. [CLAUDE.md](CLAUDE.md) records each layout and how to re-derive the anchor.
 
@@ -73,6 +74,7 @@ MemtimeHelper/
 
     WorkspaceObserver.swift  ← NSWorkspace + 1s poll loop
     ConversationTracker.swift ← Per-app change detection
+    TitleHealth.swift        ← Detects silent title-extraction breakage
     WindowTitleUpdater.swift ← SQLite writer (UPDATE / split / atomic txn)
     AXTreeDumper.swift       ← Diagnostic — writes full AX tree to ~/Desktop
 
@@ -89,6 +91,7 @@ The architecture is per-app — each tracked app implements the [`AppMonitor`](M
 protocol AppMonitor {
     var bundleID: String { get }
     var appDisplayName: String { get }
+    var expectsTitleWhenFrontmost: Bool { get }
     func currentTitle(for pid: pid_t) -> String?
 }
 ```
@@ -97,7 +100,7 @@ Steps:
 
 1. Use the included **Dump Claude AX Tree…** menu item as a model — adapt `AXTreeDumper` to your target bundle ID and run it to see the AX structure of the app you want to monitor.
 2. Find a stable anchor (a unique `AXRole`/`AXSubrole`/`AXDescription` combo near the title you want).
-3. Add a new `MyAppMonitor: AppMonitor` implementation.
+3. Add a new `MyAppMonitor: AppMonitor` implementation. Set `expectsTitleWhenFrontmost` to `true` only if the frontmost app always shows a title. Otherwise the health signal raises false alerts.
 4. Register it in [`AppDelegate`](MemtimeHelper/MemtimeHelper/AppDelegate.swift) where the monitor list is built.
 
 ## Gotchas

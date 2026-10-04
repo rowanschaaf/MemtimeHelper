@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import ServiceManagement
+import UserNotifications
 import os
 
 private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", category: "AppDelegate")
@@ -24,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        UNUserNotificationCenter.current().delegate = self
         registerLoginItemIfNeeded()
 
         if AccessibilityPermission.isGranted {
@@ -62,7 +64,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         observer.onTitleChange = { [weak self] bundleID, title in
             self?.appState.setActive(bundleID: bundleID, title: title)
         }
+        observer.onHealthEvent = { [weak self] monitor, event in
+            switch event {
+            case .alert:
+                self?.appState.setDegraded(bundleID: monitor.bundleID, appName: monitor.appDisplayName)
+                Self.postHealthAlert(appName: monitor.appDisplayName)
+            case .recovered:
+                self?.appState.clearDegraded(bundleID: monitor.bundleID)
+            }
+        }
         observer.start()
+    }
+
+    /// Posts the title-health notification. The menu bar icon is easy to miss,
+    /// so this is the signal that reaches the user. Authorisation is requested
+    /// on the first alert, when the prompt has an obvious reason. A fixed
+    /// identifier per app makes a repeat alert replace the earlier banner.
+    private static func postHealthAlert(appName: String) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            guard granted else {
+                logger.notice("Notification permission not granted: \(error?.localizedDescription ?? "denied", privacy: .public)")
+                return
+            }
+            let duration = DateComponentsFormatter.localizedString(
+                from: DateComponents(second: Int(TitleHealth.configuredThreshold())), unitsStyle: .full) ?? "a while"
+            let content = UNMutableNotificationContent()
+            content.title = "\(appName) titles are not being tracked"
+            content.body = "No \(appName) conversation title read in \(duration) of use. \(appName)'s layout may have changed. "
+                + "Open the MemtimeHelper menu (warning triangle in the menu bar) → Dump Claude AX Tree…"
+            center.add(UNNotificationRequest(identifier: "title-health-\(appName)", content: content, trigger: nil))
+        }
     }
 
     private func registerLoginItemIfNeeded() {
@@ -74,5 +106,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         } catch {
             logger.error("Failed to register login item: \(error)")
         }
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    /// Shows the banner even when MemtimeHelper is the active app (menu open).
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 }
