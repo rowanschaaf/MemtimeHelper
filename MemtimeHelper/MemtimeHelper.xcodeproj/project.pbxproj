@@ -45,6 +45,7 @@
 		1862A0CDDA3766A0D549A7B2 /* OutlookMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlookMonitor.swift; sourceTree = "<group>"; };
 		2B6EB5E712433CD845DEB9D4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		3131C7ABD5D61D571F6427D8 /* AXNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXNode.swift; sourceTree = "<group>"; };
+		33CBDCAD0E14452D8BB0FBE2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		46DAFE511547B61FE9E94EB6 /* ClaudeTitleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeTitleTests.swift; sourceTree = "<group>"; };
 		6FA94E8202FCD49F39E6E7F4 /* AppMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMonitor.swift; sourceTree = "<group>"; };
 		7D10F981736E22B6912917FD /* OutlookContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlookContext.swift; sourceTree = "<group>"; };
@@ -63,6 +64,15 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		19F1E43F24BBAA9D9F3704C9 /* MemtimeHelper */ = {
+			isa = PBXGroup;
+			children = (
+				33CBDCAD0E14452D8BB0FBE2 /* Signing.xcconfig */,
+			);
+			name = MemtimeHelper;
+			path = .;
+			sourceTree = "<group>";
+		};
 		1D8FAA5C8D7570222D2E42AA /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -76,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				B4AFA8AACBB1DA281EE60F1A /* MemtimeHelper */,
+				19F1E43F24BBAA9D9F3704C9 /* MemtimeHelper */,
 				B3D34ED8FE8B47825395A7A6 /* MemtimeHelperTests */,
 				1D8FAA5C8D7570222D2E42AA /* Products */,
 			);
@@ -163,11 +174,11 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					16018A9146F28E03512FAC82 = {
-						DevelopmentTeam = R6HLD92UQ4;
+						DevelopmentTeam = "";
 						ProvisioningStyle = Manual;
 					};
 					80243013A27F29C71AB8E939 = {
-						DevelopmentTeam = R6HLD92UQ4;
+						DevelopmentTeam = "";
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -240,10 +251,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1;
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = R6HLD92UQ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -260,6 +268,7 @@
 		};
 		261890605D2BD65159D79A21 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 33CBDCAD0E14452D8BB0FBE2 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -316,6 +325,7 @@
 		};
 		35DFA0FDCD654861F658DF16 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 33CBDCAD0E14452D8BB0FBE2 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -381,10 +391,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_IDENTITY = AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1;
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = R6HLD92UQ4;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -404,10 +411,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MemtimeHelper/MemtimeHelper.entitlements;
-				CODE_SIGN_IDENTITY = AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1;
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = R6HLD92UQ4;
 				INFOPLIST_FILE = MemtimeHelper/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -425,10 +429,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MemtimeHelper/MemtimeHelper.entitlements;
-				CODE_SIGN_IDENTITY = AC2A8C849A07D3F8FE4636AE5AF48BD66E8EFBC1;
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = R6HLD92UQ4;
 				INFOPLIST_FILE = MemtimeHelper/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

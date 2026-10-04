@@ -1,0 +1,12 @@
+// Copy to Signing.local.xcconfig. Git ignores that file.
+//
+// Set CODE_SIGN_IDENTITY to the certificate name, not its SHA-1 hash. A renewed
+// certificate keeps the same name, so the build and the Accessibility grant
+// continue to work after renewal. List your identities with:
+//   security find-identity -v -p codesigning
+//
+// DEVELOPMENT_TEAM is the OU of that certificate.
+
+CODE_SIGN_STYLE = Manual
+DEVELOPMENT_TEAM = ABCDE12345
+CODE_SIGN_IDENTITY = Apple Development: Your Name (XXXXXXXXXX)

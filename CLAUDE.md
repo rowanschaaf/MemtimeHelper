@@ -13,6 +13,9 @@ cd MemtimeHelper && xcodebuild -scheme MemtimeHelper -destination 'platform=macO
 # Test
 cd MemtimeHelper && xcodebuild test -scheme MemtimeHelper -destination 'platform=macOS'
 
+# One-time: sign with your own certificate (keeps the Accessibility grant across rebuilds)
+cp MemtimeHelper/Signing.local.xcconfig.example MemtimeHelper/Signing.local.xcconfig
+
 # Regenerate .xcodeproj after adding/removing source files
 cd MemtimeHelper && xcodegen generate
 
@@ -33,6 +36,8 @@ sqlite3 "$HOME/Library/Application Support/memtime/user/core.db" \
 ```
 MemtimeHelper/                    ← Xcode project root
   project.yml                     ← xcodegen spec — edit this, NOT the .xcodeproj
+  Signing.xcconfig                ← Default (ad-hoc) signing; optional-includes
+                                    Signing.local.xcconfig (gitignored)
   MemtimeHelper/                  ← App source
     MemtimeHelperApp.swift        ← @main, MenuBarExtra scene
     AppDelegate.swift             ← Lifecycle, login item, starts WorkspaceObserver
@@ -63,6 +68,10 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 **xcodegen workflow:** Never edit `MemtimeHelper.xcodeproj` directly. Edit `project.yml`, then run `xcodegen generate`. The `.xcodeproj` is regenerated from the spec.
 
 **No sandboxing:** The app must NOT be sandboxed. Sandboxing blocks cross-process Accessibility API access (`AXUIElement`), which is the core mechanism. Do not add `com.apple.security.app-sandbox` to the entitlements.
+
+**Signing lives in xcconfig, not project.yml:** `Signing.xcconfig` (committed) defaults to ad-hoc signing and optional-includes `Signing.local.xcconfig` (gitignored) for a personal certificate. Do not add `CODE_SIGN_*` or `DEVELOPMENT_TEAM` to `project.yml` target settings. Target settings override the xcconfig, so they block the local file. The repo is public, so personal team IDs stay out of it.
+
+**Pin the certificate by name, never by hash:** The Accessibility (TCC) grant follows the app's designated requirement, which matches on the certificate CN. A renewed certificate keeps the CN, so a name pin survives renewal. A SHA-1 hash pin does not: it broke the build once, when the pinned certificate expired. A build signed ad-hoc or by a different certificate loses the grant. Compare `codesign -d -r- <built.app>` with the installed app before you replace it.
 
 **Accessibility permission:** Requires Privacy & Security → Accessibility permission. Without it, `AXIsProcessTrusted()` returns false and all AX calls silently fail — no errors, just `nil` results.
 
