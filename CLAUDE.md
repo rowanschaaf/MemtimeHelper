@@ -58,6 +58,7 @@ MemtimeHelper/                    ← Xcode project root
     CaptureModels.swift           ← ActivitySample, CapturedSegment, SegmentType
     CaptureSchema.swift           ← Store schema text + migrations (must equal docs/capture-store-v1.sql)
     CaptureStore.swift            ← Owns ~/Library/Application Support/ActivityCapture/capture.db
+    SingleWriterLock.swift        ← flock on capture.lock; one capture writer per store
     SegmentBuilder.swift          ← Pure segment rules 1–9 (see TimesheetHelper spec 2026-10-05)
     ActivitySampler.swift         ← Sampler protocol + live sampler (frontmost app, AX title, idle, lock)
     CaptureEngine.swift           ← 1 s timer, 30 s checkpoint, write queue, sleep/lock events
@@ -115,7 +116,15 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 
 **Bounded carry-forward:** a nil extractor read keeps the last good title for at most 60 s (rule 4), then falls back to the window title with `enricher` NULL (rule 5). Lengthening the limit hides extractor outages — the September 2026 Claude outage ran 28 days unnoticed.
 
-**Segments never overlap:** `SegmentBuilder` keeps a monotone start floor, so a backwards clock or an interrupt stamped before the last sample can never start a segment before the previous one ended. Do not reset the floor to an earlier time; that reintroduces double-counted time.
+**Segments from one engine never overlap:** `SegmentBuilder` keeps a monotone start floor, so a backwards clock or an interrupt stamped before the last sample can never start a segment before the previous one ended. Do not reset the floor to an earlier time; that reintroduces double-counted time.
+
+**Single writer to capture.db:** `capture.lock` beside `capture.db` is flock'd (`O_CLOEXEC`) for the process lifetime, and capture is skipped under XCTest (`XCTestConfigurationFilePath`). A second writer would recover the live checkpoint at start and duplicate billable time. The Memtime writer (`WorkspaceObserver`) is skipped under XCTest too, so the test host never writes `core.db`.
+
+**Checkpoint discipline:** `CaptureStore.insert` deletes the checkpoint row. The engine therefore re-checkpoints the open segment after every successful insert, and never writes `checkpoint(nil)` while segments are queued in `pending`. Dropping either breaks the "a crash loses 30 s at most" bound.
+
+**AX timeouts:** `AppDelegate` sets a global 1.0 s messaging timeout on the system-wide element at launch, so the Claude/Outlook extractors (which create their own elements) cannot hang on an unresponsive app. `LiveActivitySampler.focusedWindowTitle` sets 0.5 s on its own two reads. A hung app must not stall a 1 s tick past the 10 s gap rule, which would split the segment.
+
+**App Nap opt-out:** `CaptureEngine.start()` holds a `ProcessInfo.beginActivity(.userInitiatedAllowingIdleSystemSleep)` token until `stop()`, and the timer has zero tolerance. A windowless menu-bar app is a prime App Nap candidate. Napped timers coalesce, gaps pass 10 s, and segments split. The option still lets the Mac sleep when idle.
 
 **Reactive menu bar icon:** `AppDelegate` conforms to `ObservableObject` and forwards `appState.objectWillChange` via Combine so `MenuBarExtra`'s `systemImage` updates reactively.
 
