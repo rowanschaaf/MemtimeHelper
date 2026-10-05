@@ -7,6 +7,9 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 final class OutlookMonitor: AppMonitor {
     let bundleID = "com.microsoft.Outlook"
     let appDisplayName = "Outlook"
+    // Calendar, compose and empty-selection views have no reading pane, so
+    // nil is a normal frontmost state.
+    let expectsTitleWhenFrontmost = false
 
     func currentTitle(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)

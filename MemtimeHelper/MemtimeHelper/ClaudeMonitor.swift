@@ -7,6 +7,9 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 final class ClaudeMonitor: AppMonitor {
     let bundleID = "com.anthropic.claudefordesktop"
     let appDisplayName = "Claude"
+    // Every frontmost Claude view except the launcher shows a conversation
+    // pane, so a long run of nil reads means the AX layout has changed.
+    let expectsTitleWhenFrontmost = true
 
     func currentTitle(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)
@@ -21,26 +24,17 @@ final class ClaudeMonitor: AppMonitor {
         guard let window = primaryWindow(of: app) else { return nil }
 
         // Claude tiles conversations as panes within ONE OS-level window.
-        // Each conversation pane has this exact shape (see
-        // ax-tree-com-anthropic-claudefordesktop-20260426T224551.txt for a
-        // full dump captured 2026-04-26):
-        //
-        //   AXGroup
-        //     AXPopUpButton title="{project}"      ← project / folder
-        //     AXButton      title="{conversation}" ← THE TITLE
-        //     AXPopUpButton desc="Session actions"
-        //
-        // The "Session actions" popup is the most reliable anchor — it only
-        // appears once per real conversation pane. The launcher home (which
-        // also lives under an AXLandmarkRegion) doesn't have it, so panes
-        // without a conversation are correctly ignored.
-        var sessionActionsPopups: [AXUIElement] = []
-        collectSessionActionPopups(in: window, depth: 0, into: &sessionActionsPopups)
-        if sessionActionsPopups.isEmpty { return nil }
+        // Each conversation pane has exactly one anchor element; the launcher
+        // home pane and the sidebar have none. `ClaudeTitle.isAnchor` holds the
+        // anchor shapes per Claude version (see AXNode.swift and
+        // ClaudeTitleTests). Run AXTreeDumper when the layout changes again.
+        var anchors: [AXUIElement] = []
+        collectAnchors(in: window, depth: 0, into: &anchors)
+        if anchors.isEmpty { return nil }
 
         // With multiple conversation panes, prefer the one containing the
         // focused UI element — that's the pane the user is actively in.
-        let chosen = pickPane(among: sessionActionsPopups, focusedElement: focusedElement(of: app))
+        let chosen = pickPane(among: anchors, focusedElement: focusedElement(of: app))
         return conversationTitle(for: chosen)
     }
 
@@ -69,46 +63,45 @@ final class ClaudeMonitor: AppMonitor {
 
     // MARK: - Walking
 
-    /// Collects every `AXPopUpButton` whose description is "Session actions".
-    /// Each one anchors one conversation pane.
-    private func collectSessionActionPopups(in element: AXUIElement, depth: Int, into result: inout [AXUIElement]) {
+    /// Collects every pane anchor (see `ClaudeTitle.isAnchor`).
+    /// Each one marks one conversation pane.
+    private func collectAnchors(in element: AXUIElement, depth: Int, into result: inout [AXUIElement]) {
         if depth > 30 { return }
-        if attrString(element, kAXRoleAttribute as String) == "AXPopUpButton",
-           attrString(element, kAXDescriptionAttribute as String) == "Session actions" {
+        if ClaudeTitle.isAnchor(AXElementNode(element: element)) {
             result.append(element)
-            return  // No need to descend further into a popup.
+            return  // No need to descend further into an anchor.
         }
         var childrenRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenRef) == .success,
               let children = childrenRef as? [AXUIElement] else { return }
         for child in children {
-            collectSessionActionPopups(in: child, depth: depth + 1, into: &result)
+            collectAnchors(in: child, depth: depth + 1, into: &result)
         }
     }
 
-    /// Picks the session-actions popup belonging to the pane the user is in.
+    /// Picks the anchor belonging to the pane the user is in.
     /// Falls back to the first one if no focused element or it's outside any pane.
-    private func pickPane(among popups: [AXUIElement], focusedElement: AXUIElement?) -> AXUIElement {
-        guard popups.count > 1, let focused = focusedElement else { return popups[0] }
+    private func pickPane(among anchors: [AXUIElement], focusedElement: AXUIElement?) -> AXUIElement {
+        guard anchors.count > 1, let focused = focusedElement else { return anchors[0] }
 
-        // Walk up from the focused element. The first session-actions popup
-        // that shares an ancestor (specifically, the immediate parent group of
-        // the title triple) wins.
+        // Walk up from the focused element. The first anchor below the current
+        // ancestor wins. Panes are siblings, so the focused pane's region
+        // matches before any shared container does.
         var node: AXUIElement? = focused
         var depth = 0
         while let current = node, depth < 30 {
-            for popup in popups {
-                if let popupParent = parent(of: popup), CFEqual(popupParent, current) {
-                    return popup
+            for anchor in anchors {
+                if let anchorParent = parent(of: anchor), CFEqual(anchorParent, current) {
+                    return anchor
                 }
-                if isAncestor(current, of: popup, maxDepth: 20) {
-                    return popup
+                if isAncestor(current, of: anchor, maxDepth: 20) {
+                    return anchor
                 }
             }
             node = parent(of: current)
             depth += 1
         }
-        return popups[0]
+        return anchors[0]
     }
 
     private func isAncestor(_ candidate: AXUIElement, of element: AXUIElement, maxDepth: Int) -> Bool {
@@ -124,13 +117,11 @@ final class ClaudeMonitor: AppMonitor {
 
     // MARK: - Title extraction
 
-    /// Reads the conversation title for the pane anchored by the given
-    /// "Session actions" popup. The title button's position relative to the
-    /// anchor changes across Claude versions, so the walk lives in
-    /// `ClaudeTitle.extract` (covered by `ClaudeTitleTests`) rather than
-    /// assuming a fixed sibling layout here.
-    private func conversationTitle(for sessionActionsPopup: AXUIElement) -> String? {
-        ClaudeTitle.extract(fromAnchor: AXElementNode(element: sessionActionsPopup))
+    /// Reads the conversation title for the pane marked by the given anchor.
+    /// The anchor shape and title location change across Claude versions, so
+    /// the logic lives in `ClaudeTitle` (covered by `ClaudeTitleTests`).
+    private func conversationTitle(for anchor: AXUIElement) -> String? {
+        ClaudeTitle.extract(fromAnchor: AXElementNode(element: anchor))
     }
 
     // MARK: - AX helpers

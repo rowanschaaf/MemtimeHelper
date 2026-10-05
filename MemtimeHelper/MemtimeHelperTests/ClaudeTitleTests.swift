@@ -31,6 +31,71 @@ private final class FakeAXNode: AXNode {
 
 final class ClaudeTitleTests: XCTestCase {
 
+    /// Claude 2.19675.0 (Oct 2026) pane header. The "Session actions" popup is
+    /// gone, and the title button has no `title` attribute. The title is in
+    /// its `desc`, as "{title}, rename session".
+    private func makeV2Header(renameDesc: String) -> (root: FakeAXNode, rename: FakeAXNode, moreOptions: FakeAXNode) {
+        let rename = FakeAXNode(role: "AXButton", desc: renameDesc)
+        let moreOptions = FakeAXNode(role: "AXPopUpButton", desc: "More options for Fix title extraction")
+        let root = FakeAXNode(role: "AXGroup").adding(
+            FakeAXNode(role: "AXGroup").adding(
+                FakeAXNode(role: "AXCheckBox", desc: "Remote Control"),
+                rename,
+                moreOptions,
+                FakeAXNode(role: "AXPopUpButton", title: "MemtimeHelper")
+            ),
+            FakeAXNode(role: "AXGroup").adding(
+                FakeAXNode(role: "AXCheckBox", desc: "Terminal"),
+                FakeAXNode(role: "AXCheckBox", desc: "Changes"),
+                FakeAXNode(role: "AXCheckBox", desc: "Browser"),
+                FakeAXNode(role: "AXPopUpButton", desc: "View options"),
+                FakeAXNode(role: "AXButton", desc: "Close split view")
+            )
+        )
+        return (root, rename, moreOptions)
+    }
+
+    func test_isAnchor_acceptsRenameSessionButton_v2Layout() {
+        let header = makeV2Header(renameDesc: "Fix title extraction, rename session")
+        withExtendedLifetime(header.root) {
+            XCTAssertTrue(ClaudeTitle.isAnchor(header.rename))
+        }
+    }
+
+    func test_extract_v2Layout_titleFromRenameSessionButtonDesc() {
+        let header = makeV2Header(renameDesc: "Fix title extraction, rename session")
+        withExtendedLifetime(header.root) {
+            XCTAssertEqual(ClaudeTitle.extract(fromAnchor: header.rename), "Fix title extraction")
+        }
+    }
+
+    /// A rename button with an empty title must not produce an empty title.
+    /// WorkspaceObserver writes every non-nil result to Memtime.
+    func test_extract_v2Layout_returnsNil_whenTitleIsEmpty() {
+        let header = makeV2Header(renameDesc: ", rename session")
+        withExtendedLifetime(header.root) {
+            XCTAssertNil(ClaudeTitle.extract(fromAnchor: header.rename))
+        }
+    }
+
+    /// Older Claude versions anchor on the "Session actions" popup. Keep
+    /// accepting it so an older Claude still works.
+    func test_isAnchor_acceptsLegacySessionActionsPopup() {
+        XCTAssertTrue(ClaudeTitle.isAnchor(FakeAXNode(role: "AXPopUpButton", desc: "Session actions")))
+    }
+
+    /// The sidebar has one "More options for {title}" popup and one status-
+    /// prefixed button per session. Neither may anchor a pane, or the monitor
+    /// reports a sidebar row instead of the open conversation.
+    func test_isAnchor_rejectsSidebarRowsAndPaneMoreOptions() {
+        let header = makeV2Header(renameDesc: "Fix title extraction, rename session")
+        withExtendedLifetime(header.root) {
+            XCTAssertFalse(ClaudeTitle.isAnchor(header.moreOptions))
+            XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXButton", title: "Idle Fix title extraction")))
+            XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXButton", desc: "Close split view")))
+        }
+    }
+
     /// Claude 1.14271.0 (Jun 2026): the header splits into two sibling groups —
     /// the title button is no longer a sibling of the "Session actions" popup.
     /// This is the layout that broke real title tracking on 2026-06-18.
