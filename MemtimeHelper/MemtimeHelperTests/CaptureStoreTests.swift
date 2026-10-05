@@ -119,4 +119,18 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertEqual(try store.segments(), [])
         XCTAssertNil(try store.openCheckpoint())
     }
+
+    func test_recoverCheckpoint_withUnknownType_throwsAndWritesNothing() throws {
+        try CaptureStore(url: url).close()   // creates the schema
+
+        var raw: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(url.path, &raw), SQLITE_OK)
+        defer { sqlite3_close(raw) }
+        XCTAssertEqual(sqlite3_exec(raw, "INSERT INTO open_segment (id, start, end, type) VALUES (1, 100, 130, 'bogus')", nil, nil, nil), SQLITE_OK)
+
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        XCTAssertThrowsError(try store.recoverCheckpoint())
+        XCTAssertEqual(try store.segments(), [])
+    }
 }
