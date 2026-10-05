@@ -256,7 +256,9 @@ final class SegmentBuilderTests: XCTestCase {
     func test_rule8_interrupt_closesAtEventTime() {
         var b = SegmentBuilder()
         _ = feed(&b, (100...105).map { sample($0) })
-        XCTAssertEqual(b.interrupt(at: 105), [appSegment(100, 105)])
+        // The event time (108) is later than the last sample (105), so closing at
+        // the last sample would give a different end.
+        XCTAssertEqual(b.interrupt(at: 108), [appSegment(100, 108)])
         XCTAssertNil(b.open)
     }
 
