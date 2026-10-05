@@ -174,13 +174,13 @@ final class CaptureStore {
         }
     }
 
-    func query<T>(_ sql: String, _ row: (OpaquePointer) -> T) throws -> [T] {
+    func query<T>(_ sql: String, _ row: (OpaquePointer) throws -> T) throws -> [T] {
         let stmt = try prepare(sql)
         defer { sqlite3_finalize(stmt) }
         var out: [T] = []
         while true {
             let rc = sqlite3_step(stmt)
-            if rc == SQLITE_ROW { out.append(row(stmt)); continue }
+            if rc == SQLITE_ROW { out.append(try row(stmt)); continue }
             if rc == SQLITE_DONE { return out }
             throw CaptureStoreError.sqlite(String(cString: sqlite3_errmsg(db)))
         }
@@ -219,12 +219,18 @@ private func bindSegment(_ stmt: OpaquePointer, _ s: CapturedSegment) {
     bindText(stmt, 8, s.enricher)
 }
 
-private func readSegment(_ stmt: OpaquePointer) -> CapturedSegment {
-    CapturedSegment(
+/// Only `segments.type` has a CHECK constraint, and this also reads `open_segment`,
+/// so an unknown type must be an error. Coercing it would write a made-up segment
+/// into the table TimesheetHelper drafts timesheets from.
+private func readSegment(_ stmt: OpaquePointer) throws -> CapturedSegment {
+    let typeText = columnText(stmt, 2)
+    guard let type = typeText.flatMap(SegmentType.init(rawValue:)) else {
+        throw CaptureStoreError.sqlite("unknown segment type '\(typeText ?? "NULL")'")
+    }
+    return CapturedSegment(
         start: sqlite3_column_int64(stmt, 0),
         end: sqlite3_column_int64(stmt, 1),
-        // The CHECK constraint on segments.type rules out any other value.
-        type: SegmentType(rawValue: columnText(stmt, 2) ?? "") ?? .app,
+        type: type,
         program: columnText(stmt, 3),
         title: columnText(stmt, 4),
         path: columnText(stmt, 5),
