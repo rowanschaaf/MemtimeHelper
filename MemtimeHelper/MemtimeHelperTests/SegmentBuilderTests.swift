@@ -148,4 +148,62 @@ final class SegmentBuilderTests: XCTestCase {
                                                     title: nil, path: nil, rawTitle: nil, enricher: nil))
         XCTAssertEqual(b.open, appSegment(509, 511))
     }
+
+    let claude = "com.anthropic.claudefordesktop"
+
+    func claudeSample(_ t: Int64, _ extracted: String?) -> ActivitySample {
+        sample(t, claude, title: "Claude", enricher: "claude", extracted: extracted)
+    }
+
+    func test_extractedTitle_isUsed_withEnricherName() {
+        var b = SegmentBuilder()
+        _ = b.ingest(claudeSample(100, "PAT: plan"))
+        XCTAssertEqual(b.open, CapturedSegment(start: 100, end: 100, type: .app, program: claude,
+                                               title: "PAT: plan", path: nil, rawTitle: "Claude",
+                                               enricher: "claude"))
+    }
+
+    func test_rule4_nilReadsWithin60s_keepTitle_andDoNotSplit() {
+        var b = SegmentBuilder()
+        var samples = [claudeSample(100, "PAT: plan")]
+        samples += (101...160).map { claudeSample($0, nil) }
+        let closed = feed(&b, samples)
+        XCTAssertEqual(closed, [])
+        XCTAssertEqual(b.open?.title, "PAT: plan")
+        XCTAssertEqual(b.open?.enricher, "claude")
+        XCTAssertEqual(b.open?.end, 160)
+    }
+
+    func test_rule5_nilReadsPast60s_fallBackToWindowTitle() {
+        var b = SegmentBuilder()
+        var samples = [claudeSample(100, "PAT: plan")]
+        samples += (101...161).map { claudeSample($0, nil) }
+        let closed = feed(&b, samples)
+        XCTAssertEqual(closed.map(\.title), ["PAT: plan"])
+        XCTAssertEqual(closed.first?.end, 161)
+        XCTAssertEqual(b.open?.title, "Claude")
+        XCTAssertNil(b.open?.enricher)
+    }
+
+    func test_rule5_noSuccessAtAll_recordsWindowTitle_withNilEnricher() {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...110).map { claudeSample($0, nil) })
+        XCTAssertEqual(b.open?.title, "Claude")
+        XCTAssertNil(b.open?.enricher)
+    }
+
+    func test_rule4_carryForwardIsPerApp() {
+        var b = SegmentBuilder()
+        _ = b.ingest(claudeSample(100, "PAT: plan"))
+        _ = b.ingest(sample(101, "com.microsoft.Outlook", title: "Inbox", enricher: "outlook", extracted: "Re: invoice"))
+        _ = b.ingest(claudeSample(102, nil))
+        XCTAssertEqual(b.open?.title, "PAT: plan")
+    }
+
+    func test_appWithoutExtractor_usesWindowTitle() {
+        var b = SegmentBuilder()
+        _ = b.ingest(sample(100, appA, title: "Spreadsheet"))
+        XCTAssertEqual(b.open?.title, "Spreadsheet")
+        XCTAssertNil(b.open?.enricher)
+    }
 }
