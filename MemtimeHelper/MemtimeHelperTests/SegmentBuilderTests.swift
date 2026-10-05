@@ -132,6 +132,14 @@ final class SegmentBuilderTests: XCTestCase {
                                                title: nil, path: nil, rawTitle: nil, enricher: nil))
     }
 
+    func test_rule2_idleExactly300_opensOffline() {
+        var b = SegmentBuilder()
+        let closed = feed(&b, idleRun(from: 100, to: 500))   // the last sample has idle of exactly 300
+        XCTAssertEqual(closed, [appSegment(100, 200)])
+        XCTAssertEqual(b.open, CapturedSegment(start: 200, end: 500, type: .offline, program: nil,
+                                               title: nil, path: nil, rawTitle: nil, enricher: nil))
+    }
+
     func test_rule3_inputResumes_closesOfflineAtFirstInput_andResumesActivity() {
         var b = SegmentBuilder()
         var closed = feed(&b, idleRun(from: 100, to: 510))
