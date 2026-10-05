@@ -40,7 +40,7 @@ MemtimeHelper/                    ← Xcode project root
                                     Signing.local.xcconfig (gitignored)
   MemtimeHelper/                  ← App source
     MemtimeHelperApp.swift        ← @main, MenuBarExtra scene
-    AppDelegate.swift             ← Lifecycle, login item, starts WorkspaceObserver
+    AppDelegate.swift             ← Lifecycle, login item, starts WorkspaceObserver and CaptureEngine
     AccessibilityPermission.swift ← AXIsProcessTrusted wrapper
 
     AppMonitor.swift              ← Protocol all monitored apps conform to
@@ -54,6 +54,13 @@ MemtimeHelper/                    ← Xcode project root
     TitleHealth.swift             ← Silent-breakage detector (frontmost time
                                     without a title → alert)
     WindowTitleUpdater.swift      ← SQLite writer; UPDATE / atomic split / recency filter
+
+    CaptureModels.swift           ← ActivitySample, CapturedSegment, SegmentType
+    CaptureSchema.swift           ← Store schema text + migrations (must equal docs/capture-store-v1.sql)
+    CaptureStore.swift            ← Owns ~/Library/Application Support/ActivityCapture/capture.db
+    SegmentBuilder.swift          ← Pure segment rules 1–9 (see TimesheetHelper spec 2026-10-05)
+    ActivitySampler.swift         ← Sampler protocol + live sampler (frontmost app, AX title, idle, lock)
+    CaptureEngine.swift           ← 1 s timer, 30 s checkpoint, write queue, sleep/lock events
 
     AXTreeDumper.swift            ← Diagnostic; menu item dumps full AX tree to ~/Desktop
 
@@ -99,6 +106,16 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 `ClaudeTitle.extract` handles both anchors. For the rename button, the title is its `desc` without the ", rename session" suffix. For "Session actions", it walks *up* from the anchor and, at each ancestor, searches the subtree for the first titled `AXButton` (climb and descent are depth-bounded to stay inside the header). It is pure and unit-tested via the `AXNode` protocol: see `ClaudeTitleTests`. Add a case there when the tree shifts again. If it breaks again, run `AXTreeDumper` (menu bar → "Dump Claude AX Tree…", writes to ~/Desktop), diff against the dumps, and add the new shape to `isAnchor`/`extract`. Do not commit dumps: they contain real session titles. Do not use the `AXWebArea` title as a source. It was "Claude" in every dump before 2.19675.0.
 
 **Title health signal:** Title extraction broke silently twice, and both times nothing reported it for weeks. `TitleHealth` counts cumulative *frontmost* time with nil reads, and any successful read resets it. At 600 s, `WorkspaceObserver` logs an `.error` line and `AppDelegate` sets the menu bar triangle and posts a notification. The notification repeats at most once per calendar day while the app stays degraded. Background time never counts, because a backgrounded Claude returns stub trees. A poll gap adds 5 s at most, so wake from sleep does not count. Only monitors with `expectsTitleWhenFrontmost == true` take part (Claude yes, Outlook no: Calendar and compose views have no reading pane). To test it live, shorten the threshold with `defaults write com.memtimehelper.MemtimeHelper TitleHealthThresholdSeconds -int 20`, then relaunch. Delete the key afterwards.
+
+**Capture store is a cross-language contract:** TimesheetHelper reads `capture.db` in native mode. `docs/capture-store-v1.sql` is the canonical schema and `CaptureSchemaTests` fails if `CaptureSchema.v1` drifts from it. Migrations only add tables or columns — never rename or drop — so an older TimesheetHelper keeps working. After a schema change, copy the file to TimesheetHelper's `tests/fixtures/`.
+
+**Two writers run until cutover:** `WorkspaceObserver` + `WindowTitleUpdater` still write extracted titles into Memtime's `core.db` (so Memtime stays a fair baseline for the side-by-side run). `CaptureEngine` writes only to `capture.db`. Never point new code at `core.db`.
+
+**Closed segments only:** `segments.end` is never NULL. The open segment lives in `open_segment` (checkpointed every 30 s) and is recovered at launch. Do not reintroduce Memtime-style open rows.
+
+**Bounded carry-forward:** a nil extractor read keeps the last good title for at most 60 s (rule 4), then falls back to the window title with `enricher` NULL (rule 5). Lengthening the limit hides extractor outages — the September 2026 Claude outage ran 28 days unnoticed.
+
+**Segments never overlap:** `SegmentBuilder` keeps a monotone start floor, so a backwards clock or an interrupt stamped before the last sample can never start a segment before the previous one ended. Do not reset the floor to an earlier time; that reintroduces double-counted time.
 
 **Reactive menu bar icon:** `AppDelegate` conforms to `ObservableObject` and forwards `appState.objectWillChange` via Combine so `MenuBarExtra`'s `systemImage` updates reactively.
 

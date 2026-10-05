@@ -9,10 +9,10 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let appState = AppState()
-    private let observer = WorkspaceObserver(monitors: [
-        ClaudeMonitor(),
-        OutlookMonitor()
-    ])
+    /// Shared by the Memtime writer and the native capture engine.
+    private let monitors: [AppMonitor] = [ClaudeMonitor(), OutlookMonitor()]
+    private lazy var observer = WorkspaceObserver(monitors: monitors)
+    private var captureEngine: CaptureEngine?
     private var cancellables = Set<AnyCancellable>()
     private var permissionTimer: Timer?
 
@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         NSApp.setActivationPolicy(.accessory)
         UNUserNotificationCenter.current().delegate = self
         registerLoginItemIfNeeded()
+        startCapture()
 
         if AccessibilityPermission.isGranted {
             logger.notice("AX permission granted — starting observer")
@@ -42,9 +43,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationWillTerminate(_ notification: Notification) {
         permissionTimer?.invalidate()
         observer.stop()
+        captureEngine?.stop()
     }
 
     // MARK: - Private
+
+    private func startCapture() {
+        do {
+            let store = try CaptureStore(url: CaptureStore.defaultURL)
+            try store.replaceEnrichers(LiveActivitySampler.enricherNames(for: monitors))
+            let engine = CaptureEngine(sampler: LiveActivitySampler(monitors: monitors), store: store)
+            engine.start()
+            captureEngine = engine
+            logger.notice("Native capture started: \(CaptureStore.defaultURL.path, privacy: .public)")
+        } catch {
+            logger.error("Native capture failed to start: \(String(describing: error), privacy: .public)")
+        }
+    }
 
     private func startPermissionPolling() {
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
