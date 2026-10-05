@@ -14,6 +14,7 @@
 		2021FC0D0B07D2A15192CDA6 /* AppMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FA94E8202FCD49F39E6E7F4 /* AppMonitor.swift */; };
 		263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */; };
 		3CC06CA35DC799AA351842BA /* CaptureSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 537D712BA87934CB0751A7AD /* CaptureSchema.swift */; };
+		52ED3DF919E88905AF3A832A /* SegmentBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C5B674BC4F92F63053146EF /* SegmentBuilderTests.swift */; };
 		562E6ECCE208AAE33BBCB3E8 /* OutlookContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D10F981736E22B6912917FD /* OutlookContext.swift */; };
 		58296F0C11BA89542D180EBA /* CaptureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FAE019A04D343EAEA50E18C /* CaptureModels.swift */; };
 		5E2EDA8A24B1F50ECB3ACC46 /* ConversationTrackerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D77A875C80A0AC9CC0D27D9 /* ConversationTrackerTests.swift */; };
@@ -22,6 +23,7 @@
 		6F283F200AE1C5FAEF15EB69 /* WorkspaceObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B431B4875BDEBCF259F22CE4 /* WorkspaceObserver.swift */; };
 		6F315A775B7E7E3D45C06AAD /* AXTreeDumper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3E43321940C6DC924EA99CC /* AXTreeDumper.swift */; };
 		744BC67DE727240D2F52009F /* AccessibilityPermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0A059005AD56A1E0CBFAEF /* AccessibilityPermission.swift */; };
+		88A8C83C61FEA6C36EE697B8 /* SegmentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03832F2A56DF41DF28EC1988 /* SegmentBuilder.swift */; };
 		98EED2FAA6551AD6EA54B189 /* WindowTitleFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */; };
 		9A73B21BC15946320DAD0A46 /* AccessibilityPermissionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0D4B822A69FCDD94EDF3EE /* AccessibilityPermissionTests.swift */; };
 		A12E46E8585C3B06D2A6BF67 /* ClaudeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80CBBE42EA8F5533BA3E23F /* ClaudeMonitor.swift */; };
@@ -46,6 +48,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03832F2A56DF41DF28EC1988 /* SegmentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentBuilder.swift; sourceTree = "<group>"; };
 		04B6E62D17D4BB39EC385008 /* MemtimeHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MemtimeHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0913B608D58ADE3B526D5098 /* MemtimeHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MemtimeHelper.entitlements; sourceTree = "<group>"; };
 		0923AC2EF37F41FB547DFE4B /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -60,6 +63,7 @@
 		537D712BA87934CB0751A7AD /* CaptureSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureSchema.swift; sourceTree = "<group>"; };
 		5FAE019A04D343EAEA50E18C /* CaptureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModels.swift; sourceTree = "<group>"; };
 		6FA94E8202FCD49F39E6E7F4 /* AppMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMonitor.swift; sourceTree = "<group>"; };
+		7C5B674BC4F92F63053146EF /* SegmentBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SegmentBuilderTests.swift; sourceTree = "<group>"; };
 		7D10A7FFC0A20450302E4B99 /* AppStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStateTests.swift; sourceTree = "<group>"; };
 		7D10F981736E22B6912917FD /* OutlookContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlookContext.swift; sourceTree = "<group>"; };
 		8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
@@ -117,6 +121,7 @@
 				CCCD56E3A3A04F4674FB8F5D /* CaptureStoreTests.swift */,
 				46DAFE511547B61FE9E94EB6 /* ClaudeTitleTests.swift */,
 				9D77A875C80A0AC9CC0D27D9 /* ConversationTrackerTests.swift */,
+				7C5B674BC4F92F63053146EF /* SegmentBuilderTests.swift */,
 				A5B831A36EB9BC5BFBE98883 /* TitleHealthTests.swift */,
 				F7244E2D8839321A8E71D97F /* WindowTitleFormatterTests.swift */,
 			);
@@ -143,6 +148,7 @@
 				8DC70E80C41FF5CD5B59C605 /* MenuBarView.swift */,
 				7D10F981736E22B6912917FD /* OutlookContext.swift */,
 				1862A0CDDA3766A0D549A7B2 /* OutlookMonitor.swift */,
+				03832F2A56DF41DF28EC1988 /* SegmentBuilder.swift */,
 				44A509BA0A165ACBF2DFECA6 /* TitleHealth.swift */,
 				C6B3F343111BA77192BE8540 /* WindowTitleUpdater.swift */,
 				B431B4875BDEBCF259F22CE4 /* WorkspaceObserver.swift */,
@@ -247,6 +253,7 @@
 				F244B603734BFC888BA36802 /* MenuBarView.swift in Sources */,
 				562E6ECCE208AAE33BBCB3E8 /* OutlookContext.swift in Sources */,
 				1E652EF369489F75CF55E79D /* OutlookMonitor.swift in Sources */,
+				88A8C83C61FEA6C36EE697B8 /* SegmentBuilder.swift in Sources */,
 				189C12C449C2813F44B78F16 /* TitleHealth.swift in Sources */,
 				263A2BEFF72ABBF45E873222 /* WindowTitleUpdater.swift in Sources */,
 				6F283F200AE1C5FAEF15EB69 /* WorkspaceObserver.swift in Sources */,
@@ -263,6 +270,7 @@
 				A80AD0C9F4070F798953C969 /* CaptureStoreTests.swift in Sources */,
 				102729EDFA0E0DDCDBD27D70 /* ClaudeTitleTests.swift in Sources */,
 				5E2EDA8A24B1F50ECB3ACC46 /* ConversationTrackerTests.swift in Sources */,
+				52ED3DF919E88905AF3A832A /* SegmentBuilderTests.swift in Sources */,
 				D87D4B13E6DD2B7933A6D44C /* TitleHealthTests.swift in Sources */,
 				98EED2FAA6551AD6EA54B189 /* WindowTitleFormatterTests.swift in Sources */,
 			);
