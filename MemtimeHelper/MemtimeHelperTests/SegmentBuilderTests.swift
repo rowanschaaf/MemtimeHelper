@@ -82,4 +82,33 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertNil(b.open?.path)
         XCTAssertEqual(b.open?.title, "Edge — Board")
     }
+
+    func test_clockBackwards_neverOverlaps() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...110).map { sample($0) })
+        closed += b.ingest(sample(105))
+        XCTAssertEqual(closed, [appSegment(100, 110)])
+        XCTAssertGreaterThanOrEqual(b.open!.start, 110)
+        XCTAssertGreaterThanOrEqual(b.open!.end, b.open!.start)
+    }
+
+    func test_interruptThenEarlierSample_neverOverlaps() {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...110).map { sample($0) })
+        _ = b.interrupt(at: 110)
+        _ = b.ingest(sample(108))
+        XCTAssertGreaterThanOrEqual(b.open!.start, 110)
+        XCTAssertGreaterThanOrEqual(b.open!.end, b.open!.start)
+    }
+
+    func test_interruptThenWakeWithStaleIdle_offlineStartsAtWake() {
+        // No segment while the Mac sleeps: the idle counter spans the sleep,
+        // but the offline segment may only start at the wake sample.
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...105).map { sample($0) })
+        _ = b.interrupt(at: 105)
+        _ = b.ingest(sample(4000, idle: 3895))
+        XCTAssertEqual(b.open?.type, .offline)
+        XCTAssertEqual(b.open?.start, 4000)
+    }
 }

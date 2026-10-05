@@ -29,14 +29,14 @@ struct SegmentBuilder {
         // at the last sample. This does not depend on sleep notifications.
         if let last = lastSampleTime, s.time < last || s.time - last > Self.maxSampleGap {
             closed += close(at: last)
-            floor = s.time
+            raiseFloor(to: s.time)
         }
         lastSampleTime = s.time
 
         // Rule 9: no segment while the screen is locked.
         if s.isLocked {
             closed += close(at: s.time)
-            floor = s.time
+            raiseFloor(to: s.time)
             return closed
         }
 
@@ -44,19 +44,19 @@ struct SegmentBuilder {
 
         // Rules 2 and 3: idle time becomes an offline segment.
         if s.idleSeconds >= Self.idleThreshold {
-            if open?.type == .offline {
-                open?.end = s.time
+            if let current = open, current.type == .offline {
+                open?.end = max(current.start, s.time)
             } else {
                 closed += close(at: lastInput)
                 let start = max(lastInput, floor ?? lastInput)
-                open = CapturedSegment(start: start, end: s.time, type: .offline, program: nil,
+                open = CapturedSegment(start: start, end: max(start, s.time), type: .offline, program: nil,
                                        title: nil, path: nil, rawTitle: nil, enricher: nil)
             }
             return closed
         }
 
         // Rule 3: input resumed, so the offline segment ends at the first input.
-        var startAt = s.time
+        var startAt = max(s.time, floor ?? s.time)
         if open?.type == .offline {
             closed += close(at: lastInput)
             startAt = max(lastInput, floor ?? lastInput)
@@ -71,12 +71,12 @@ struct SegmentBuilder {
         let next = describe(s, program: program)
         if let current = open, current.type == next.type, current.program == next.program,
            current.title == next.title, current.path == next.path {
-            open?.end = s.time
+            open?.end = max(current.start, s.time)
         } else {
             closed += close(at: startAt)
             var segment = next
             segment.start = startAt
-            segment.end = s.time
+            segment.end = max(startAt, s.time)
             open = segment
         }
         return closed
@@ -85,8 +85,7 @@ struct SegmentBuilder {
     /// Rule 8: sleep, screen lock and user switch end the open segment at the event time.
     mutating func interrupt(at time: Int64) -> [CapturedSegment] {
         let closed = close(at: time)
-        lastSampleTime = nil
-        floor = time
+        raiseFloor(to: time)
         return closed
     }
 
@@ -116,12 +115,17 @@ struct SegmentBuilder {
                                path: nil, rawTitle: s.windowTitle, enricher: enricher)
     }
 
+    /// The floor only moves forward, so a backwards clock cannot pull it back.
+    private mutating func raiseFloor(to time: Int64) {
+        floor = max(floor ?? time, time)
+    }
+
     /// Ends the open segment at `time`. A zero-length segment is dropped.
     private mutating func close(at time: Int64) -> [CapturedSegment] {
         guard var segment = open else { return [] }
         open = nil
         segment.end = max(segment.start, time)
-        floor = segment.end
+        raiseFloor(to: segment.end)
         return segment.end > segment.start ? [segment] : []
     }
 }
