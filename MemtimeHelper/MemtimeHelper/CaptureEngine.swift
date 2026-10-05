@@ -27,6 +27,7 @@ final class CaptureEngine {
     private var ticks = 0
     private var writeFailing = false
     private var timer: Timer?
+    private var activity: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
     private var distributedObservers: [NSObjectProtocol] = []
 
@@ -36,6 +37,11 @@ final class CaptureEngine {
     }
 
     func start() {
+        guard timer == nil else { return }
+        // Without this, App Nap throttles the timer of a menu-bar app with no windows,
+        // and the resulting gaps over 10 s split segments (rule 6).
+        activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep, reason: "Native activity capture")
         do {
             if let recovered = try store.recoverCheckpoint() {
                 logger.notice("Recovered open segment \(recovered.start)–\(recovered.end)")
@@ -49,6 +55,7 @@ final class CaptureEngine {
             guard let self else { return }
             MainActor.assumeIsolated { self.tick() }
         }
+        timer.tolerance = 0
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
         observeInterruptions()
@@ -57,6 +64,8 @@ final class CaptureEngine {
     func stop(at time: Int64 = Int64(Date().timeIntervalSince1970)) {
         timer?.invalidate()
         timer = nil
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        activity = nil
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         distributedObservers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
         workspaceObservers = []

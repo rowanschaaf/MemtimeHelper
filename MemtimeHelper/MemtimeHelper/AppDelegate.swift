@@ -28,9 +28,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         NSApp.setActivationPolicy(.accessory)
         UNUserNotificationCenter.current().delegate = self
         registerLoginItemIfNeeded()
+        // A hung frontmost app must not stall a 1 s tick past the 10 s gap rule; this global
+        // value also bounds the Claude/Outlook extractors, which create their own elements.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 1.0)
         startCapture()
 
-        if AccessibilityPermission.isGranted {
+        // The test host is a second process; it must not write Memtime's core.db.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            logger.notice("Running under XCTest; Memtime writer not started")
+        } else if AccessibilityPermission.isGranted {
             logger.notice("AX permission granted — starting observer")
             startObserver()
         } else {

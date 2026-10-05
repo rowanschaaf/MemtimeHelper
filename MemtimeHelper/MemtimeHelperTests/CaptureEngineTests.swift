@@ -112,3 +112,16 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(writer.recoverCalls, 1)
     }
 }
+
+@MainActor
+final class CaptureEngineLifecycleTests: XCTestCase {
+    func test_startTwiceThenStop_leavesNoLiveTimer() {
+        let sampler = FakeSampler()           // empty queue: any tick would crash
+        let engine = CaptureEngine(sampler: sampler, store: FakeWriter())
+        engine.start()
+        engine.start()
+        engine.stop(at: 100)
+        RunLoop.current.run(until: Date().addingTimeInterval(1.5))
+        XCTAssertTrue(sampler.queue.isEmpty)  // reaching here means no tick fired
+    }
+}

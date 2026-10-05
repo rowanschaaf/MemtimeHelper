@@ -40,7 +40,8 @@ final class LiveActivitySampler: ActivitySampler {
         return sample
     }
 
-    /// A hung app must not stall a tick past the 10 s gap rule.
+    /// Bounds this function's two AX reads so a hung app cannot stall a tick past the
+    /// 10 s gap rule. The global timeout set at launch covers the extractors.
     private static let axTimeout: Float = 0.5
 
     /// Nil without the Accessibility grant: AX calls then fail and the app and
