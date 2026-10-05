@@ -111,4 +111,33 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertEqual(b.open?.type, .offline)
         XCTAssertEqual(b.open?.start, 4000)
     }
+
+    /// Input stops at t = 200 and the user stays away. Samples arrive every second.
+    func idleRun(from start: Int64, to end: Int64, lastInput: Int64 = 200) -> [ActivitySample] {
+        (start...end).map { t in sample(t, idle: max(0, t - lastInput)) }
+    }
+
+    func test_rule2_idleBelowThreshold_staysActive() {
+        var b = SegmentBuilder()
+        let closed = feed(&b, idleRun(from: 100, to: 499))   // idle reaches 299
+        XCTAssertEqual(closed, [])
+        XCTAssertEqual(b.open?.type, .app)
+    }
+
+    func test_rule2_idleAtThreshold_endsActiveAtLastInput_andOpensOffline() {
+        var b = SegmentBuilder()
+        let closed = feed(&b, idleRun(from: 100, to: 510))   // idle reaches 300 at t = 500
+        XCTAssertEqual(closed, [appSegment(100, 200)])
+        XCTAssertEqual(b.open, CapturedSegment(start: 200, end: 510, type: .offline, program: nil,
+                                               title: nil, path: nil, rawTitle: nil, enricher: nil))
+    }
+
+    func test_rule3_inputResumes_closesOfflineAtFirstInput_andResumesActivity() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, idleRun(from: 100, to: 510))
+        closed += b.ingest(sample(511, idle: 2))             // first input at t = 509
+        XCTAssertEqual(closed.last, CapturedSegment(start: 200, end: 509, type: .offline, program: nil,
+                                                    title: nil, path: nil, rawTitle: nil, enricher: nil))
+        XCTAssertEqual(b.open, appSegment(509, 511))
+    }
 }
