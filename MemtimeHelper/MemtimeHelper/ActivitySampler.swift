@@ -40,15 +40,21 @@ final class LiveActivitySampler: ActivitySampler {
         return sample
     }
 
+    /// A hung app must not stall a tick past the 10 s gap rule.
+    private static let axTimeout: Float = 0.5
+
     /// Nil without the Accessibility grant: AX calls then fail and the app and
     /// idle capture continue without titles.
     static func focusedWindowTitle(pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, axTimeout)
         var window: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &window) == .success,
               let window else { return nil }
+        let windowElement = window as! AXUIElement
+        AXUIElementSetMessagingTimeout(windowElement, axTimeout)
         var title: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(window as! AXUIElement, kAXTitleAttribute as CFString, &title) == .success,
+        guard AXUIElementCopyAttributeValue(windowElement, kAXTitleAttribute as CFString, &title) == .success,
               let text = title as? String, !text.isEmpty else { return nil }
         return text
     }
