@@ -97,6 +97,52 @@ final class CaptureStore {
         return Dictionary(uniqueKeysWithValues: rows)
     }
 
+    // MARK: - Segments
+
+    private static let columns = "start, end, type, program, title, path, raw_title, enricher"
+
+    /// Writes a closed segment. The checkpoint described the segment that just
+    /// closed, so the same transaction deletes it.
+    func insert(_ segment: CapturedSegment) throws {
+        try transaction {
+            try run("INSERT INTO segments (\(Self.columns)) VALUES (?, ?, ?, ?, ?, ?, ?, ?)") {
+                bindSegment($0, segment)
+            }
+            try exec("DELETE FROM open_segment")
+        }
+    }
+
+    /// Saves the open segment so a crash loses 30 s at most. Nil deletes the row.
+    func checkpoint(_ segment: CapturedSegment?) throws {
+        guard let segment else {
+            try exec("DELETE FROM open_segment")
+            return
+        }
+        try run("INSERT OR REPLACE INTO open_segment (id, \(Self.columns)) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)") {
+            bindSegment($0, segment)
+        }
+    }
+
+    /// At launch: a leftover checkpoint becomes a closed segment that ends at
+    /// its last checkpoint time.
+    func recoverCheckpoint() throws -> CapturedSegment? {
+        guard let leftover = try openCheckpoint() else { return nil }
+        if leftover.end > leftover.start {
+            try insert(leftover)
+        } else {
+            try checkpoint(nil)
+        }
+        return leftover
+    }
+
+    func openCheckpoint() throws -> CapturedSegment? {
+        try query("SELECT \(Self.columns) FROM open_segment WHERE id = 1", readSegment).first
+    }
+
+    func segments() throws -> [CapturedSegment] {
+        try query("SELECT \(Self.columns) FROM segments ORDER BY start, id", readSegment)
+    }
+
     // MARK: - SQLite helpers
 
     func transaction(_ body: () throws -> Void) throws {
@@ -160,4 +206,28 @@ private func bindText(_ stmt: OpaquePointer, _ index: Int32, _ value: String?) {
 private func columnText(_ stmt: OpaquePointer, _ index: Int32) -> String? {
     guard let text = sqlite3_column_text(stmt, index) else { return nil }
     return String(cString: text)
+}
+
+private func bindSegment(_ stmt: OpaquePointer, _ s: CapturedSegment) {
+    sqlite3_bind_int64(stmt, 1, s.start)
+    sqlite3_bind_int64(stmt, 2, s.end)
+    bindText(stmt, 3, s.type.rawValue)
+    bindText(stmt, 4, s.program)
+    bindText(stmt, 5, s.title)
+    bindText(stmt, 6, s.path)
+    bindText(stmt, 7, s.rawTitle)
+    bindText(stmt, 8, s.enricher)
+}
+
+private func readSegment(_ stmt: OpaquePointer) -> CapturedSegment {
+    CapturedSegment(
+        start: sqlite3_column_int64(stmt, 0),
+        end: sqlite3_column_int64(stmt, 1),
+        // The CHECK constraint on segments.type rules out any other value.
+        type: SegmentType(rawValue: columnText(stmt, 2) ?? "") ?? .app,
+        program: columnText(stmt, 3),
+        title: columnText(stmt, 4),
+        path: columnText(stmt, 5),
+        rawTitle: columnText(stmt, 6),
+        enricher: columnText(stmt, 7))
 }
