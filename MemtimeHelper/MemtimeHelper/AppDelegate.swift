@@ -13,6 +13,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private let monitors: [AppMonitor] = [ClaudeMonitor(), OutlookMonitor()]
     private lazy var observer = WorkspaceObserver(monitors: monitors)
     private var captureEngine: CaptureEngine?
+    private var captureLock: SingleWriterLock?
     private var cancellables = Set<AnyCancellable>()
     private var permissionTimer: Timer?
 
@@ -49,7 +50,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // MARK: - Private
 
     private func startCapture() {
+        // The test host is a second process; it must not write the live store.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            logger.notice("Running under XCTest; native capture not started")
+            return
+        }
         do {
+            let directory = CaptureStore.defaultURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+                                                    attributes: [.posixPermissions: 0o700])
+            guard let lock = SingleWriterLock(url: directory.appendingPathComponent("capture.lock")) else {
+                logger.error("Another MemtimeHelper instance owns the capture store; native capture not started")
+                return
+            }
+            captureLock = lock
             let store = try CaptureStore(url: CaptureStore.defaultURL)
             try store.replaceEnrichers(LiveActivitySampler.enricherNames(for: monitors))
             let engine = CaptureEngine(sampler: LiveActivitySampler(monitors: monitors), store: store)
