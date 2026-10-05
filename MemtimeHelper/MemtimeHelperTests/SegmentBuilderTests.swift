@@ -224,4 +224,60 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertEqual(b.open?.title, "PAT: review")
         XCTAssertEqual(b.open?.enricher, "claude")
     }
+
+    func test_rule6_gapOver10s_closesAtLastSample() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += b.ingest(sample(116))
+        XCTAssertEqual(closed, [appSegment(100, 105)])
+        XCTAssertEqual(b.open, appSegment(116, 116))
+    }
+
+    func test_rule6_gapOf10s_doesNotSplit() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += b.ingest(sample(115))
+        XCTAssertEqual(closed, [])
+        XCTAssertEqual(b.open, appSegment(100, 115))
+    }
+
+    func test_rule7_clockBackwards_closesAtLastSample() throws {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += b.ingest(sample(90))
+        XCTAssertEqual(closed, [appSegment(100, 105)])
+        // The new segment starts at the floor, not at the earlier clock reading,
+        // so it cannot overlap the segment that just closed.
+        let open = try XCTUnwrap(b.open)
+        XCTAssertEqual(open.start, 105)
+        XCTAssertGreaterThanOrEqual(open.end, open.start)
+    }
+
+    func test_rule8_interrupt_closesAtEventTime() {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...105).map { sample($0) })
+        XCTAssertEqual(b.interrupt(at: 105), [appSegment(100, 105)])
+        XCTAssertNil(b.open)
+    }
+
+    func test_rule9_locked_opensNoSegment() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += feed(&b, (106...120).map { sample($0, locked: true) })
+        XCTAssertEqual(closed, [appSegment(100, 106)])
+        XCTAssertNil(b.open)
+        _ = b.ingest(sample(121))
+        XCTAssertEqual(b.open, appSegment(121, 121))
+    }
+
+    func test_wakeWithStaleIdle_offlineStartsAtWake_notBeforeSleep() {
+        // The Mac slept from t = 105. On wake the idle counter still measures from
+        // the last input before sleep, so offline must not reach back across the sleep.
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += b.ingest(sample(4000, idle: 3895))
+        XCTAssertEqual(closed, [appSegment(100, 105)])
+        XCTAssertEqual(b.open?.type, .offline)
+        XCTAssertEqual(b.open?.start, 4000)
+    }
 }
