@@ -57,7 +57,7 @@ xcodebuild -scheme MemtimeHelper -destination 'platform=macOS' build
 open MemtimeHelper.xcodeproj
 ```
 
-The first run will prompt for Accessibility permission. Without it, all AX reads return `nil` silently — nothing gets tracked.
+The first run will prompt for Accessibility permission. Without it, all AX reads return `nil` silently, so no conversation or email titles are read and nothing is written to Memtime. Native capture still records the frontmost app and idle time, with NULL titles.
 
 ### Code signing
 
@@ -138,7 +138,7 @@ Steps:
 
 - **Claude Desktop only** for now (Claude Code in the Web/CLI isn't covered).
 - Only segments time when the conversation title *changes*. If you stay in one conversation for hours, that's still one block (correctly).
-- Nothing is sent off-device. The app reads `~/Library/Application Support/memtime/user/core.db` and Claude/Outlook AX trees, period. No analytics, no network calls.
+- Nothing is sent off-device. The app reads Claude/Outlook AX trees and writes titles into `~/Library/Application Support/memtime/user/core.db`. Its own capture also reads the frontmost app, the focused-window title of any frontmost app, idle time and screen-lock state, and stores them locally in `~/Library/Application Support/ActivityCapture/capture.db` (mode 0600). No analytics, no network calls.
 
 ## License
 
