@@ -67,7 +67,9 @@ final class CaptureEngine {
     func tick() {
         write(builder.ingest(sampler.sample()))
         ticks += 1
-        if ticks % Self.checkpointInterval == 0 {
+        // With nothing open, a checkpoint(nil) would delete the only durable copy
+        // of a closed segment still waiting in `pending`.
+        if ticks % Self.checkpointInterval == 0, builder.open != nil || pending.isEmpty {
             do {
                 try store.checkpoint(builder.open)
             } catch {
@@ -85,10 +87,12 @@ final class CaptureEngine {
     /// the next tick retries; the app never stops capture because a write failed.
     private func write(_ closed: [CapturedSegment]) {
         pending += closed
+        var inserted = false
         while let next = pending.first {
             do {
                 try store.insert(next)
                 pending.removeFirst()
+                inserted = true
                 if writeFailing {
                     writeFailing = false
                     logger.notice("Segment writes recovered")
@@ -99,6 +103,15 @@ final class CaptureEngine {
                     logger.error("Segment write failed; queueing: \(String(describing: error), privacy: .public)")
                 }
                 break
+            }
+        }
+        // insert() deletes the checkpoint row. If it ran while a later segment was
+        // open, that segment's checkpoint went with it, so write it again.
+        if inserted, let open = builder.open {
+            do {
+                try store.checkpoint(open)
+            } catch {
+                logger.error("Checkpoint failed: \(String(describing: error), privacy: .public)")
             }
         }
         if pending.count > Self.maxPending {

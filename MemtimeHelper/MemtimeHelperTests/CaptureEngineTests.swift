@@ -65,6 +65,34 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(writer.inserted.map(\.title), ["Doc A"])
     }
 
+    /// `CaptureStore.insert` deletes the checkpoint row, so a retry that lands
+    /// after the open segment was checkpointed must write that checkpoint again.
+    func test_successfulRetry_recheckpointsTheOpenSegment() {
+        let sampler = FakeSampler()
+        sampler.queue = [sample(100), sample(101, title: "Doc B"), sample(102, title: "Doc B")]
+        let writer = FakeWriter()
+        writer.failInserts = 1
+        let engine = CaptureEngine(sampler: sampler, store: writer)
+        for _ in 0..<3 { engine.tick() }
+        XCTAssertEqual(writer.inserted.map(\.title), ["Doc A"])
+        XCTAssertEqual(writer.checkpoints.last??.title, "Doc B")
+    }
+
+    /// With no open segment, `checkpoint(nil)` would delete the only durable
+    /// copy of the interval still waiting in `pending`.
+    func test_checkpointTick_whileLockedWithPendingSegments_keepsTheCheckpoint() {
+        let sampler = FakeSampler()
+        sampler.queue = [sample(100)] + (101...129).map {
+            ActivitySample(time: Int64($0), bundleID: "com.example.a", windowTitle: "Doc A", isLocked: true)
+        }
+        let writer = FakeWriter()
+        writer.failInserts = 1000
+        let engine = CaptureEngine(sampler: sampler, store: writer)
+        for _ in 0..<30 { engine.tick() }
+        XCTAssertTrue(writer.checkpoints.isEmpty)
+        XCTAssertEqual(engine.pending.count, 1)
+    }
+
     func test_interrupt_writesTheOpenSegment() {
         let sampler = FakeSampler()
         sampler.queue = [sample(100), sample(101)]
