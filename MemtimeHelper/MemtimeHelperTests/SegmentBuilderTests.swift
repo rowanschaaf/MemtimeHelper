@@ -206,4 +206,22 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertEqual(b.open?.title, "Spreadsheet")
         XCTAssertNil(b.open?.enricher)
     }
+
+    func test_rule4_laterSuccess_resetsTheWindow() {
+        var b = SegmentBuilder()
+        var samples = [claudeSample(100, "PAT: plan")]
+        samples += (101...149).map { claudeSample($0, nil) }
+        samples.append(claudeSample(150, "PAT: plan"))          // same title; window restarts at 150
+        samples += (151...211).map { claudeSample($0, nil) }    // 211 is 61 s after 150, 111 s after 100
+        let closed = feed(&b, samples)
+        XCTAssertEqual(closed.map(\.end), [211])
+        XCTAssertEqual(b.open?.title, "Claude")
+    }
+
+    func test_rule4_carriesTheLatestExtractedTitle() {
+        var b = SegmentBuilder()
+        _ = feed(&b, [claudeSample(100, "PAT: plan"), claudeSample(150, "PAT: review"), claudeSample(151, nil)])
+        XCTAssertEqual(b.open?.title, "PAT: review")
+        XCTAssertEqual(b.open?.enricher, "claude")
+    }
 }
