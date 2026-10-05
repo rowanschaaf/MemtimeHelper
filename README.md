@@ -24,6 +24,8 @@ MemtimeHelper bridges the gap by reading the active conversation/email title via
 11:45 ─┘
 ```
 
+MemtimeHelper also records its own activity timeline to `~/Library/Application Support/ActivityCapture/capture.db` (frontmost app, window title, idle). TimesheetHelper can read that store instead of Memtime. Both run side by side until the native store proves parity.
+
 ## How it works
 
 1. A 1Hz polling loop reads the active conversation/email title from each monitored app's Accessibility (AX) tree.
