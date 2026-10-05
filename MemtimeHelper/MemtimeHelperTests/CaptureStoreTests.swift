@@ -56,4 +56,67 @@ final class CaptureStoreTests: XCTestCase {
         try store.replaceEnrichers(["com.c": "c"])
         XCTAssertEqual(try store.enrichers(), ["com.c": "c"])
     }
+
+    private func segment(_ start: Int64, _ end: Int64, title: String = "Doc") -> CapturedSegment {
+        CapturedSegment(start: start, end: end, type: .app, program: "com.example.app",
+                        title: title, path: nil, rawTitle: title, enricher: nil)
+    }
+
+    func test_insert_writesClosedSegment() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        try store.insert(segment(100, 160))
+        XCTAssertEqual(try store.segments(), [segment(100, 160)])
+    }
+
+    func test_insert_clearsTheCheckpoint() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        try store.checkpoint(segment(100, 130))
+        try store.insert(segment(100, 160))
+        XCTAssertNil(try store.openCheckpoint())
+    }
+
+    func test_checkpoint_keepsOneRow() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        try store.checkpoint(segment(100, 130))
+        try store.checkpoint(segment(100, 160))
+        XCTAssertEqual(try store.openCheckpoint(), segment(100, 160))
+    }
+
+    func test_checkpointNil_deletesTheRow() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        try store.checkpoint(segment(100, 130))
+        try store.checkpoint(nil)
+        XCTAssertNil(try store.openCheckpoint())
+    }
+
+    func test_recoverCheckpoint_closesTheLeftoverAtItsCheckpointTime() throws {
+        let first = try CaptureStore(url: url)
+        try first.checkpoint(segment(100, 130))
+        first.close()   // simulates a crash: the segment never closed
+
+        let second = try CaptureStore(url: url)
+        defer { second.close() }
+        XCTAssertEqual(try second.recoverCheckpoint(), segment(100, 130))
+        XCTAssertEqual(try second.segments(), [segment(100, 130)])
+        XCTAssertNil(try second.openCheckpoint())
+    }
+
+    func test_recoverCheckpoint_withNoRow_returnsNil() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        XCTAssertNil(try store.recoverCheckpoint())
+    }
+
+    func test_recoverCheckpoint_dropsZeroLengthLeftover() throws {
+        let store = try CaptureStore(url: url)
+        defer { store.close() }
+        try store.checkpoint(segment(100, 100))
+        _ = try store.recoverCheckpoint()
+        XCTAssertEqual(try store.segments(), [])
+        XCTAssertNil(try store.openCheckpoint())
+    }
 }
