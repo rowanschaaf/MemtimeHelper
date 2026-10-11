@@ -134,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     private func registerLoginItemIfNeeded() {
         do {
-            if SMAppService.mainApp.status == .notRegistered {
+            if LoginItem.shouldRegister(SMAppService.mainApp.status) {
                 try SMAppService.mainApp.register()
                 logger.notice("Registered as login item")
             }
