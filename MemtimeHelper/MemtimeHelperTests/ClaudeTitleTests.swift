@@ -169,4 +169,54 @@ final class ClaudeTitleTests: XCTestCase {
             XCTAssertNil(ClaudeTitle.extract(fromAnchor: sessionActions))
         }
     }
+
+    /// Claude 5.1231.2 (dumped 2026-11-12) pane header. The rename button is
+    /// gone. The header is an `AXToolbar` "Session tools", and the title is an
+    /// `AXHeading` in its first group.
+    private func makeV5Header(heading: String) -> (root: FakeAXNode, toolbar: FakeAXNode) {
+        let toolbar = FakeAXNode(role: "AXToolbar", title: "Session tools", desc: "Session tools").adding(
+            FakeAXNode(role: "AXGroup").adding(
+                FakeAXNode(role: "AXHeading", title: heading, desc: heading),
+                FakeAXNode(role: "AXPopUpButton", title: "More options for \(heading)",
+                           desc: "More options for \(heading)")
+            ),
+            FakeAXNode(role: "AXGroup").adding(
+                FakeAXNode(role: "AXCheckBox", title: "Session rail", desc: "Session rail"),
+                FakeAXNode(role: "AXCheckBox", title: "Terminal", desc: "Terminal"),
+                FakeAXNode(role: "AXPopUpButton", title: "View options", desc: "View options")
+            )
+        )
+        let root = FakeAXNode(role: "AXGroup").adding(toolbar)
+        return (root, toolbar)
+    }
+
+    func test_isAnchor_acceptsSessionToolsToolbar_v5Layout() {
+        let header = makeV5Header(heading: "COS: Timesheet Helper")
+        withExtendedLifetime(header.root) {
+            XCTAssertTrue(ClaudeTitle.isAnchor(header.toolbar))
+        }
+    }
+
+    func test_extract_v5Layout_titleFromHeadingInSessionTools() {
+        let header = makeV5Header(heading: "COS: Timesheet Helper")
+        withExtendedLifetime(header.root) {
+            XCTAssertEqual(ClaudeTitle.extract(fromAnchor: header.toolbar), "COS: Timesheet Helper")
+        }
+    }
+
+    /// WorkspaceObserver writes every non-nil result, so an empty heading
+    /// must read as nil.
+    func test_extract_v5Layout_returnsNil_whenHeadingIsEmpty() {
+        let header = makeV5Header(heading: "")
+        withExtendedLifetime(header.root) {
+            XCTAssertNil(ClaudeTitle.extract(fromAnchor: header.toolbar))
+        }
+    }
+
+    /// The sidebar has headings too ("Pinned", one per project group). They
+    /// sit outside any "Session tools" toolbar, so they must never anchor.
+    func test_isAnchor_rejectsSidebarHeadingsAndOtherToolbars() {
+        XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXHeading", title: "Pinned")))
+        XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXToolbar", title: "Formatting")))
+    }
 }

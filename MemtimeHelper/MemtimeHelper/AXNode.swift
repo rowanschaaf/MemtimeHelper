@@ -54,6 +54,9 @@ struct AXElementNode: AXNode {
 ///   - Oct 2026 (2.19675.0): "Session actions" is gone. The title button has
 ///     no `title`; its `desc` is "{title}, rename session". That button is
 ///     the anchor, and the title comes from its own `desc`.
+///   - Nov 2026 (5.1231.2): the rename button is gone. The header is an
+///     `AXToolbar desc="Session tools"`; that toolbar is the anchor, and the
+///     title is the first `AXHeading` inside it.
 ///
 /// For the "Session actions" anchor, walk up from the anchor and, at each
 /// ancestor, search its subtree for the first `AXButton` with a non-empty
@@ -66,10 +69,15 @@ enum ClaudeTitle {
     private static let renameSuffix = ", rename session"
 
     static func isAnchor(_ node: AXNode) -> Bool {
-        isRenameButton(node) || (node.role == "AXPopUpButton" && node.desc == "Session actions")
+        isSessionToolbar(node)
+            || isRenameButton(node)
+            || (node.role == "AXPopUpButton" && node.desc == "Session actions")
     }
 
     static func extract(fromAnchor anchor: AXNode, maxClimb: Int = 4, maxDescend: Int = 6) -> String? {
+        if isSessionToolbar(anchor) {
+            return firstHeadingTitle(in: anchor, maxDepth: 3)
+        }
         if isRenameButton(anchor), let desc = anchor.desc {
             let title = String(desc.dropLast(renameSuffix.count))
             return title.isEmpty ? nil : title
@@ -89,6 +97,23 @@ enum ClaudeTitle {
 
     private static func isRenameButton(_ node: AXNode) -> Bool {
         node.role == "AXButton" && (node.desc?.hasSuffix(renameSuffix) ?? false)
+    }
+
+    private static func isSessionToolbar(_ node: AXNode) -> Bool {
+        node.role == "AXToolbar" && (node.desc == "Session tools" || node.title == "Session tools")
+    }
+
+    private static func firstHeadingTitle(in node: AXNode, maxDepth: Int) -> String? {
+        if maxDepth < 0 { return nil }
+        if node.role == "AXHeading", let title = node.title ?? node.desc, !title.isEmpty {
+            return title
+        }
+        for child in node.children {
+            if let title = firstHeadingTitle(in: child, maxDepth: maxDepth - 1) {
+                return title
+            }
+        }
+        return nil
     }
 
     private static func firstButtonTitle(in node: AXNode, maxDepth: Int) -> String? {
