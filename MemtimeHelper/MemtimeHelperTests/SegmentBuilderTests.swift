@@ -262,6 +262,19 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertNil(b.open)
     }
 
+    func test_rule8_interrupt_afterIdle_offlineCannotSpanTheEvent() throws {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...105).map { sample($0) })
+        _ = feed(&b, (106...395).map { sample($0, idle: $0 - 105) })   // idle reaches 290
+        _ = b.interrupt(at: 396)                                         // display sleep
+        // Idle reaches 300 within the gap limit. The offline segment must start at
+        // the event, not reach back over it to the last input at 105.
+        _ = b.ingest(sample(405, idle: 300))
+        let open = try XCTUnwrap(b.open)
+        XCTAssertEqual(open.type, .offline)
+        XCTAssertGreaterThanOrEqual(open.start, 396)
+    }
+
     func test_rule8_interrupt_withNoIdle_keepsTheSegmentToTheLastSample() {
         var b = SegmentBuilder()
         _ = feed(&b, (100...120).map { sample($0) })
