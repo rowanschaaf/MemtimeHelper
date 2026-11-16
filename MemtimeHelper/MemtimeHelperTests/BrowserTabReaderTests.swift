@@ -1,12 +1,13 @@
 import XCTest
 @testable import MemtimeHelper
 
+@MainActor
 final class BrowserTabReaderTests: XCTestCase {
     private let edge = "com.microsoft.edgemac"
     private var requests = 0
     private var executions = 0
     private var pendingAnswer: ((AutomationPermission) -> Void)?
-    private var nextResult: Result<NSAppleEventDescriptor, Int> = .failure(-1712)
+    private var nextResult: Result<NSAppleEventDescriptor, AppleScriptError> = .failure(AppleScriptError(number: -1712))
 
     private func tab(_ mode: String, _ url: String, _ title: String) -> NSAppleEventDescriptor {
         let list = NSAppleEventDescriptor.list()
@@ -75,7 +76,7 @@ final class BrowserTabReaderTests: XCTestCase {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
-        nextResult = .failure(-1743)
+        nextResult = .failure(AppleScriptError(number: -1743))
         XCTAssertNil(reader.activeTab(bundleID: edge))
         XCTAssertNil(reader.activeTab(bundleID: edge))
         XCTAssertEqual(executions, 1)
@@ -85,7 +86,7 @@ final class BrowserTabReaderTests: XCTestCase {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
-        nextResult = .failure(-1712)
+        nextResult = .failure(AppleScriptError(number: -1712))
         XCTAssertNil(reader.activeTab(bundleID: edge))
         nextResult = .success(tab("normal", "https://example.com", "Page"))
         XCTAssertEqual(reader.activeTab(bundleID: edge)?.url, "https://example.com")
