@@ -61,7 +61,7 @@ MemtimeHelper/                    ← Xcode project root
     SingleWriterLock.swift        ← flock on capture.lock; one capture writer per store
     SegmentBuilder.swift          ← Pure segment rules 1–9 (see TimesheetHelper spec 2026-10-05)
     ActivitySampler.swift         ← Sampler protocol + live sampler (frontmost app, AX title, idle, lock)
-    BrowserTab.swift              ← EdgeTab.parse: tab text -> URL and title; requires window mode "normal"
+    BrowserTab.swift              ← EdgeTab.parse: tab text -> BrowserTabResult (tab, privateWindow, unavailable)
     BrowserTabReader.swift        ← @MainActor Edge tab reader (compiled AppleScript, Automation grant)
     CaptureEngine.swift           ← 1 s timer, 30 s checkpoint, write queue, sleep/lock events
 
@@ -129,7 +129,12 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 
 **`raw_title` lags on browser segments:** a segment records `raw_title` (the AX window title) from its first tick only. At a window switch AppleScript sees the new Edge window one tick before Accessibility does, so `raw_title` on an Edge segment often names the previous window. `title` and `path` come from one AppleScript call and are correct (probe 2026-11-17). Do not use `raw_title` for attribution.
 
-**Browser URLs need Automation; private windows are never read:** `BrowserTabReader` is `@MainActor`. It runs one compiled AppleScript on the main thread inside the tick. The sampler is not isolated, so it calls the reader with `MainActor.assumeIsolated`. This is safe because `CaptureEngine` is `@MainActor` and calls `sample()` on the main thread. The script is bounded by `with timeout of 1 second`. It returns an empty URL and title unless `mode of w is "normal"`, so private data never leaves Edge. `EdgeTab.parse` also requires mode "normal" and drops any other window. The reader first asks for the Automation grant with `AEDeterminePermissionToAutomateTarget` on a background queue. An Apple Event sent while the consent prompt is open blocks the main thread. A denial (`-1743`) stops Edge reads for the process lifetime. Failures surface as `AppleScriptError`. Safari URLs are not recorded: AppleScript gives no way to tell a private Safari window from a normal one (checked 2026-11-17). See the M3 plan, Task 1.
+**Browser URLs need Automation; private windows are never read:** `BrowserTabReader` is `@MainActor`. It runs one compiled AppleScript on the main thread inside the tick. The sampler is not isolated, so it calls the reader with `MainActor.assumeIsolated`. This is safe because `CaptureEngine` is `@MainActor` and calls `sample()` on the main thread. The reader returns `BrowserTabResult`: `.tab`, `.privateWindow` or `.unavailable`. Privacy rules, applied in `LiveActivitySampler.applyBrowserPrivacy` and `SegmentBuilder.describe`:
+- **A.** An Edge window that is not "normal" records no URL, no tab title and no window title. The segment has `title` "Private window", `raw_title` NULL and `path` NULL.
+- **B.** Safari records no titles. Every Safari segment has `title` "Safari", `raw_title` NULL and `path` NULL. AppleScript gives no way to tell a private Safari window from a normal one (checked 2026-11-17).
+- **C.** An AX window title that contains "(InPrivate)" is never stored, even for a normal Edge window. The AX title lags one tick at window switches, so a normal segment can otherwise take the private window's title.
+
+The script sets a 1 s AppleScript timeout per event (`with timeout of 1 second`). This does not bound the whole script: each Apple Event can take up to 1 s. After a timeout error (`-1712`) the reader skips the next 10 calls (back-off), then tries again. The script resolves `front window` once, so the mode check and the URL read see the same window. The reader first asks for the Automation grant with `AEDeterminePermissionToAutomateTarget` on a background queue. An Apple Event sent while the consent prompt is open blocks the main thread. A denial (`-1743`) stops Edge reads for the process lifetime. `-1744` maps to `.unavailable` and is asked again on the next call. Failures surface as `AppleScriptError`. See the M3 plan, Task 1.
 
 **AX timeouts:** `AppDelegate` sets a global 1.0 s messaging timeout on the system-wide element at launch, so the Claude/Outlook extractors (which create their own elements) cannot hang on an unresponsive app. `LiveActivitySampler.focusedWindowTitle` sets 0.5 s on its own two reads. A hung app must not stall a 1 s tick past the 10 s gap rule, which would split the segment.
 
