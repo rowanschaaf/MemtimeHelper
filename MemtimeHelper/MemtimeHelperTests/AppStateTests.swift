@@ -26,4 +26,28 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.statusIcon, "circle.fill")
         XCTAssertEqual(state.statusMessage, "A conversation")
     }
+
+    func test_captureStopped_showsStoppedIconAndReason() {
+        let state = AppState()
+        state.setCaptureStatus(.stopped("the capture store could not open"))
+        XCTAssertEqual(state.statusIcon, "xmark.octagon.fill")
+        XCTAssertTrue(state.statusMessage.contains("the capture store could not open"))
+    }
+
+    func test_captureDegraded_listsEachReason() {
+        let state = AppState()
+        state.setCaptureStatus(.degraded([.accessibilityMissing, .storeWritesFailing]))
+        XCTAssertEqual(state.statusIcon, "exclamationmark.triangle.fill")
+        XCTAssertTrue(state.statusMessage.contains(CaptureHealth.Reason.accessibilityMissing.message))
+        XCTAssertTrue(state.statusMessage.contains(CaptureHealth.Reason.storeWritesFailing.message))
+    }
+
+    func test_captureRecovered_returnsToTheAppStatus() {
+        let state = AppState()
+        state.setActive(bundleID: "com.anthropic.claudefordesktop", title: "PAT: plan")
+        state.setCaptureStatus(.degraded([.storeWritesFailing]))
+        state.setCaptureStatus(.capturing)
+        XCTAssertEqual(state.statusMessage, "PAT: plan")
+        XCTAssertEqual(state.statusIcon, "circle.fill")
+    }
 }
