@@ -36,5 +36,27 @@ final class BrowserTabTests: XCTestCase {
         XCTAssertTrue(EdgeTab.source.contains("with timeout of 1 second"))
         XCTAssertTrue(EdgeTab.source.contains("mode of w"))
         XCTAssertTrue(EdgeTab.source.contains(EdgeTab.bundleID))
+        XCTAssertTrue(EdgeTab.source.contains("if mode of w is not \"normal\""))
+    }
+
+    func test_bundleID_isPinned() {
+        XCTAssertEqual(EdgeTab.bundleID, "com.microsoft.edgemac")
+        XCTAssertTrue(EdgeTab.source.contains("\"com.microsoft.edgemac\""))
+    }
+
+    func test_twoItemList_givesNothing() {
+        XCTAssertNil(EdgeTab.parse(result(["normal", "https://x"])))
+    }
+
+    func test_fourItemList_givesNothing() {
+        XCTAssertNil(EdgeTab.parse(result(["normal", "https://x", "T", "extra"])))
+    }
+
+    func test_nonListDescriptor_givesNothing() {
+        XCTAssertNil(EdgeTab.parse(NSAppleEventDescriptor(string: "normal")))
+    }
+
+    func test_normalWindowWithEmptyURL_givesNothing() {
+        XCTAssertNil(EdgeTab.parse(result(["normal", "", "Title"])))
     }
 }
