@@ -24,7 +24,7 @@ MemtimeHelper bridges the gap by reading the active conversation/email title via
 11:45 ─┘
 ```
 
-MemtimeHelper also records its own activity timeline to `~/Library/Application Support/ActivityCapture/capture.db` (frontmost app, window title, idle). TimesheetHelper can read that store instead of Memtime. Both run side by side until the native store proves parity.
+MemtimeHelper also records its own activity timeline to `~/Library/Application Support/ActivityCapture/capture.db` (frontmost app, window title, idle). It also records the URL and title of the active Microsoft Edge tab. It never does this for an InPrivate window and never for Safari. The data is stored only in `capture.db` on this Mac. This needs the Automation permission for Microsoft Edge. TimesheetHelper can read that store instead of Memtime. Both run side by side until the native store proves parity.
 
 ## How it works
 
