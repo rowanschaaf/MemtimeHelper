@@ -20,6 +20,11 @@ final class CaptureEngine {
     /// More than one day of segments at one per second.
     static let maxPending = 86_400
 
+    /// Called with every sample, before it enters the segment builder.
+    var onSample: ((ActivitySample) -> Void)?
+    /// Called with true when segment writes start failing, and false when they recover.
+    var onWritesFailingChanged: ((Bool) -> Void)?
+
     private let sampler: ActivitySampler
     private let store: CaptureWriting
     private var builder = SegmentBuilder()
@@ -74,7 +79,9 @@ final class CaptureEngine {
     }
 
     func tick() {
-        write(builder.ingest(sampler.sample()))
+        let sample = sampler.sample()
+        onSample?(sample)
+        write(builder.ingest(sample))
         ticks += 1
         // With nothing open, a checkpoint(nil) would delete the only durable copy
         // of a closed segment still waiting in `pending`.
@@ -104,11 +111,13 @@ final class CaptureEngine {
                 inserted = true
                 if writeFailing {
                     writeFailing = false
+                    onWritesFailingChanged?(false)
                     logger.notice("Segment writes recovered")
                 }
             } catch {
                 if !writeFailing {
                     writeFailing = true
+                    onWritesFailingChanged?(true)
                     logger.error("Segment write failed; queueing: \(String(describing: error), privacy: .public)")
                 }
                 break
