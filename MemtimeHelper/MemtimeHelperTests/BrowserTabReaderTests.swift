@@ -72,6 +72,26 @@ final class BrowserTabReaderTests: XCTestCase {
         XCTAssertEqual(executions, 0)
     }
 
+    func test_onDenied_firesForAPermissionDenial() {
+        let reader = makeReader()
+        var denials = 0
+        reader.onDenied = { denials += 1 }
+        _ = reader.activeTab(bundleID: edge)
+        pendingAnswer?(.denied)
+        XCTAssertEqual(denials, 1)
+    }
+
+    func test_onDenied_firesForAScriptDenial() {
+        let reader = makeReader()
+        var denials = 0
+        reader.onDenied = { denials += 1 }
+        _ = reader.activeTab(bundleID: edge)
+        pendingAnswer?(.granted)
+        nextResult = .failure(AppleScriptError(number: -1743))
+        _ = reader.activeTab(bundleID: edge)
+        XCTAssertEqual(denials, 1)
+    }
+
     func test_scriptDenial_stopsForGood() {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)

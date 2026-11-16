@@ -34,6 +34,9 @@ final class BrowserTabReader: BrowserTabReading {
     private var state = State.unknown
     private var backoffCalls = 0
 
+    /// Called when the Automation grant is denied or revoked.
+    var onDenied: (() -> Void)?
+
     init(requestPermission: @escaping (String, @escaping (AutomationPermission) -> Void) -> Void,
          execute: @escaping () -> Result<NSAppleEventDescriptor, AppleScriptError>) {
         self.requestPermission = requestPermission
@@ -62,6 +65,7 @@ final class BrowserTabReader: BrowserTabReading {
             case .failure(let error):
                 if error.number == Self.notPermitted {
                     state = .denied
+                    onDenied?()
                     logger.error("Automation for Edge was revoked; Edge URLs are no longer captured")
                 } else if error.number == Self.timedOut {
                     // A hung Edge costs the 1 s timeout on every tick; skip the next calls.
@@ -78,6 +82,7 @@ final class BrowserTabReader: BrowserTabReading {
         case .granted: state = .granted
         case .denied:
             state = .denied
+            onDenied?()
             logger.error("Automation for Edge is denied; Edge segments are captured without URLs")
         case .unavailable: state = .unknown
         }
