@@ -16,6 +16,7 @@ enum EdgeTab {
     tell application id "\(bundleID)"
       if (count of windows) is 0 then return {"", "", ""}
       set w to front window
+      if mode of w is not "normal" then return {mode of w, "", ""}
       return {mode of w, URL of active tab of w, title of active tab of w}
     end tell
     end timeout
