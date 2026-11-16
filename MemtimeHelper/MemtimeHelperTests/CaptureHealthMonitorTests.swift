@@ -1,6 +1,13 @@
 import XCTest
 @testable import MemtimeHelper
 
+private struct StubMonitor: AppMonitor {
+    let bundleID: String
+    let appDisplayName: String
+    let expectsTitleWhenFrontmost: Bool
+    func currentTitle(for pid: pid_t) -> String? { nil }
+}
+
 @MainActor
 final class CaptureHealthMonitorTests: XCTestCase {
     private let claude = "com.anthropic.claudefordesktop"
@@ -119,5 +126,15 @@ final class CaptureHealthMonitorTests: XCTestCase {
         m.setWritesFailing(true)
         XCTAssertEqual(m.status, .stopped("gone"))
         XCTAssertEqual(statuses, [.stopped("gone")])
+    }
+
+    /// Outlook returns no title in its calendar and empty-inbox views, so a
+    /// title alert for it is noise. Only apps that opt in are health checked.
+    func test_healthCheckedExtractors_skipAppsThatDoNotExpectATitle() {
+        let monitors: [AppMonitor] = [
+            StubMonitor(bundleID: "com.example.chat", appDisplayName: "Chat", expectsTitleWhenFrontmost: true),
+            StubMonitor(bundleID: "com.example.mail", appDisplayName: "Mail", expectsTitleWhenFrontmost: false),
+        ]
+        XCTAssertEqual(CaptureHealthMonitor.healthCheckedExtractors(monitors), ["com.example.chat": "Chat"])
     }
 }

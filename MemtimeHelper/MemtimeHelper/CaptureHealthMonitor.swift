@@ -20,6 +20,13 @@ final class CaptureHealthMonitor {
         self.isAccessibilityGranted = isAccessibilityGranted
     }
 
+    /// The extractor apps to health check: only those that always yield a title
+    /// while frontmost. Outlook has views with no title, so it would alert falsely.
+    static func healthCheckedExtractors(_ monitors: [AppMonitor]) -> [String: String] {
+        Dictionary(uniqueKeysWithValues: monitors.filter(\.expectsTitleWhenFrontmost)
+            .map { ($0.bundleID, $0.appDisplayName) })
+    }
+
     func record(_ sample: ActivitySample, at now: Date) {
         health.set(.accessibilityMissing, active: !isAccessibilityGranted())
         for (program, app) in extractors {
