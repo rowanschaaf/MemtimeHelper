@@ -78,4 +78,46 @@ final class CaptureHealthMonitorTests: XCTestCase {
         m.setWritesFailing(false)
         XCTAssertEqual(statuses, [.stopped("another MemtimeHelper instance owns the capture store")])
     }
+
+    func test_newDay_whileDegraded_alertsAgain_andStaysDegraded() {
+        let m = makeMonitor(threshold: 10)
+        let noon = Calendar.current.date(bySettingHour: 12, minute: 0, second: 0, of: Date(timeIntervalSince1970: 1_800_000_000))!
+        for i in 0...15 { m.record(claudeSample(0, title: nil), at: noon.addingTimeInterval(TimeInterval(i))) }
+        XCTAssertEqual(alerts, ["Claude"])
+        let nextNoon = Calendar.current.date(byAdding: .day, value: 1, to: noon)!
+        for i in 0...15 { m.record(claudeSample(0, title: nil), at: nextNoon.addingTimeInterval(TimeInterval(i))) }
+        XCTAssertEqual(alerts, ["Claude", "Claude"])
+        XCTAssertEqual(m.status, .degraded([.titlesNotRead(app: "Claude")]))
+    }
+
+    func test_missingTimeAccumulatesAcrossSpells_andRecoveryIsPerApp() {
+        let outlook = "com.microsoft.Outlook"
+        let m = CaptureHealthMonitor(extractors: [claude: "Claude", outlook: "Outlook"], threshold: 10,
+                                     isAccessibilityGranted: { true })
+        m.onTitleAlert = { [unowned self] in alerts.append($0) }
+        var t: Int64 = 100
+        for _ in 0..<6 { m.record(claudeSample(t, title: nil), at: at(t)); t += 1 }
+        for _ in 0..<20 {
+            m.record(ActivitySample(time: t, bundleID: "com.example.app", windowTitle: "Doc"), at: at(t)); t += 1
+        }
+        XCTAssertEqual(alerts, [])
+        for _ in 0..<6 { m.record(claudeSample(t, title: nil), at: at(t)); t += 1 }
+        XCTAssertEqual(alerts, ["Claude"])
+        XCTAssertEqual(m.status, .degraded([.titlesNotRead(app: "Claude")]))
+
+        m.record(ActivitySample(time: t, bundleID: outlook, windowTitle: "Outlook",
+                                enricherName: "outlook", extractedTitle: "Re: x"), at: at(t)); t += 1
+        XCTAssertEqual(m.status, .degraded([.titlesNotRead(app: "Claude")]))
+
+        m.record(claudeSample(t, title: "PAT: plan"), at: at(t))
+        XCTAssertEqual(m.status, .capturing)
+    }
+
+    func test_afterStop_writesFailing_keepsStoppedAndDoesNotNotify() {
+        let m = makeMonitor()
+        m.stop(because: "gone")
+        m.setWritesFailing(true)
+        XCTAssertEqual(m.status, .stopped("gone"))
+        XCTAssertEqual(statuses, [.stopped("gone")])
+    }
 }
