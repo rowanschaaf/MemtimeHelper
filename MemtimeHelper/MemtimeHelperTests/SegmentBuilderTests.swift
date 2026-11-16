@@ -93,6 +93,33 @@ final class SegmentBuilderTests: XCTestCase {
                                                rawTitle: nil, enricher: nil))
     }
 
+    func test_privateChrome_isBrowser_withPrivateWindowTitle() {
+        var b = SegmentBuilder()
+        var s = sample(100, "com.google.Chrome", title: nil)
+        s.isPrivateWindow = true
+        _ = b.ingest(s)
+        XCTAssertEqual(b.open, CapturedSegment(start: 100, end: 100, type: .browser,
+                                               program: "com.google.Chrome", title: "Private window",
+                                               path: nil, rawTitle: nil, enricher: nil))
+    }
+
+    func test_normalChrome_isBrowser_withWindowTitle() {
+        var b = SegmentBuilder()
+        _ = b.ingest(sample(100, "com.google.Chrome", title: "Docs - Google Chrome"))
+        XCTAssertEqual(b.open, CapturedSegment(start: 100, end: 100, type: .browser,
+                                               program: "com.google.Chrome", title: "Docs - Google Chrome",
+                                               path: nil, rawTitle: "Docs - Google Chrome", enricher: nil))
+    }
+
+    func test_privateNonBrowserApp_isPrivateWindow() {
+        var b = SegmentBuilder()
+        var s = sample(100, appA, title: nil)
+        s.isPrivateWindow = true
+        _ = b.ingest(s)
+        XCTAssertEqual(b.open?.title, "Private window")
+        XCTAssertNil(b.open?.rawTitle)
+    }
+
     func test_safari_recordsOnlyProgramAndType() {
         var b = SegmentBuilder()
         _ = b.ingest(sample(100, "com.apple.Safari", title: "Some page", url: "https://x", tab: "Some page"))

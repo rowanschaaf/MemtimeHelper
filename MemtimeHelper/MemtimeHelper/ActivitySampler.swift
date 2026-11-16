@@ -47,11 +47,15 @@ final class LiveActivitySampler: ActivitySampler {
         return sample
     }
 
-    static let safariBundleID = "com.apple.Safari"
+    /// Window-title markers of a private window. English only: a localised
+    /// browser may label its private windows differently.
+    static let privateWindowMarkers = ["(InPrivate)", "(Incognito)"]
 
     /// Browser privacy rules. Edge records URL and tab title for a normal window only;
-    /// a private window records nothing. An AX title naming InPrivate is never kept,
-    /// because it lags one tick at window switches. Safari records no titles at all.
+    /// a private window records nothing. In any app, a window title carrying a private
+    /// marker is never kept and marks the sample private. The one exception is a normal
+    /// Edge tab: its AX title lags one tick at window switches, so only the title is cleared.
+    /// Safari records no titles at all.
     static func applyBrowserPrivacy(_ sample: inout ActivitySample, tab: BrowserTabResult) {
         if sample.bundleID == EdgeTab.bundleID {
             switch tab {
@@ -63,16 +67,16 @@ final class LiveActivitySampler: ActivitySampler {
             case .unavailable:
                 break
             }
-            if sample.windowTitle?.contains("(InPrivate)") == true {
-                sample.windowTitle = nil
-                if case .tab = tab {} else { sample.isPrivateWindow = true }
-            }
-            if sample.isPrivateWindow {
-                sample.windowTitle = nil
-                sample.url = nil
-                sample.tabTitle = nil
-            }
-        } else if sample.bundleID == safariBundleID {
+        } else if sample.bundleID == SegmentBuilder.safariBundleID {
+            sample.windowTitle = nil
+            sample.url = nil
+            sample.tabTitle = nil
+        }
+        if let title = sample.windowTitle, privateWindowMarkers.contains(where: title.contains) {
+            sample.windowTitle = nil
+            if sample.bundleID == EdgeTab.bundleID, case .tab = tab {} else { sample.isPrivateWindow = true }
+        }
+        if sample.isPrivateWindow {
             sample.windowTitle = nil
             sample.url = nil
             sample.tabTitle = nil
