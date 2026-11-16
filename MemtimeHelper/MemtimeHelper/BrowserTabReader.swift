@@ -6,7 +6,7 @@ private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", catego
 
 @MainActor
 protocol BrowserTabReading {
-    func activeTab(bundleID: String) -> BrowserTab?
+    func activeTab(bundleID: String) -> BrowserTabResult
 }
 
 /// The AppleScript error number, carried as the `Result` failure value.
@@ -26,10 +26,13 @@ final class BrowserTabReader: BrowserTabReading {
     private enum State { case unknown, requesting, granted, denied }
 
     private static let notPermitted = -1743
+    private static let timedOut = -1712
+    private static let backoffLength = 10
 
     private let requestPermission: (String, @escaping (AutomationPermission) -> Void) -> Void
     private let execute: () -> Result<NSAppleEventDescriptor, AppleScriptError>
     private var state = State.unknown
+    private var backoffCalls = 0
 
     init(requestPermission: @escaping (String, @escaping (AutomationPermission) -> Void) -> Void,
          execute: @escaping () -> Result<NSAppleEventDescriptor, AppleScriptError>) {
@@ -37,18 +40,22 @@ final class BrowserTabReader: BrowserTabReading {
         self.execute = execute
     }
 
-    func activeTab(bundleID: String) -> BrowserTab? {
-        guard bundleID == EdgeTab.bundleID else { return nil }
+    func activeTab(bundleID: String) -> BrowserTabResult {
+        guard bundleID == EdgeTab.bundleID else { return .unavailable }
         switch state {
         case .denied, .requesting:
-            return nil
+            return .unavailable
         case .unknown:
             state = .requesting
             requestPermission(bundleID) { [weak self] permission in
                 self?.apply(permission)
             }
-            return nil
+            return .unavailable
         case .granted:
+            if backoffCalls > 0 {
+                backoffCalls -= 1
+                return .unavailable
+            }
             switch execute() {
             case .success(let result):
                 return EdgeTab.parse(result)
@@ -56,8 +63,12 @@ final class BrowserTabReader: BrowserTabReading {
                 if error.number == Self.notPermitted {
                     state = .denied
                     logger.error("Automation for Edge was revoked; Edge URLs are no longer captured")
+                } else if error.number == Self.timedOut {
+                    // A hung Edge costs the 1 s timeout on every tick; skip the next calls.
+                    backoffCalls = Self.backoffLength
                 }
-                return nil
+                // -1744 (consent needed) also lands here as .unavailable and is re-asked on the next call.
+                return .unavailable
             }
         }
     }

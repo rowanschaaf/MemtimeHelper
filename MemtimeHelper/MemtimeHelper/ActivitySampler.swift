@@ -42,12 +42,41 @@ final class LiveActivitySampler: ActivitySampler {
             sample.extractedTitle = monitor.currentTitle(for: pid)
         }
         // CaptureEngine is @MainActor and calls sample() on the main thread.
-        if let bundleID,
-           let tab = MainActor.assumeIsolated({ tabReader.activeTab(bundleID: bundleID) }) {
-            sample.url = tab.url
-            sample.tabTitle = tab.title
-        }
+        let tab = bundleID.map { id in MainActor.assumeIsolated { tabReader.activeTab(bundleID: id) } }
+        Self.applyBrowserPrivacy(&sample, tab: tab ?? .unavailable)
         return sample
+    }
+
+    static let safariBundleID = "com.apple.Safari"
+
+    /// Browser privacy rules. Edge records URL and tab title for a normal window only;
+    /// a private window records nothing. An AX title naming InPrivate is never kept,
+    /// because it lags one tick at window switches. Safari records no titles at all.
+    static func applyBrowserPrivacy(_ sample: inout ActivitySample, tab: BrowserTabResult) {
+        if sample.bundleID == EdgeTab.bundleID {
+            switch tab {
+            case .tab(let found):
+                sample.url = found.url
+                sample.tabTitle = found.title
+            case .privateWindow:
+                sample.isPrivateWindow = true
+            case .unavailable:
+                break
+            }
+            if sample.windowTitle?.contains("(InPrivate)") == true {
+                sample.windowTitle = nil
+                if case .tab = tab {} else { sample.isPrivateWindow = true }
+            }
+            if sample.isPrivateWindow {
+                sample.windowTitle = nil
+                sample.url = nil
+                sample.tabTitle = nil
+            }
+        } else if sample.bundleID == safariBundleID {
+            sample.windowTitle = nil
+            sample.url = nil
+            sample.tabTitle = nil
+        }
     }
 
     /// Bounds this function's two AX reads so a hung app cannot stall a tick past the

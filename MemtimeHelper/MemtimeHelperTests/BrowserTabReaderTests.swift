@@ -31,16 +31,16 @@ final class BrowserTabReaderTests: XCTestCase {
 
     func test_otherApps_neverRequestOrExecute() {
         let reader = makeReader()
-        XCTAssertNil(reader.activeTab(bundleID: "com.apple.Safari"))
-        XCTAssertNil(reader.activeTab(bundleID: "com.example.app"))
+        XCTAssertEqual(reader.activeTab(bundleID: "com.apple.Safari"), .unavailable)
+        XCTAssertEqual(reader.activeTab(bundleID: "com.example.app"), .unavailable)
         XCTAssertEqual(requests, 0)
         XCTAssertEqual(executions, 0)
     }
 
     func test_firstEdgeCall_requestsPermission_andSendsNoEvent() {
         let reader = makeReader()
-        XCTAssertNil(reader.activeTab(bundleID: edge))
-        XCTAssertNil(reader.activeTab(bundleID: edge))   // still requesting
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)   // still requesting
         XCTAssertEqual(requests, 1)
         XCTAssertEqual(executions, 0)
     }
@@ -50,24 +50,24 @@ final class BrowserTabReaderTests: XCTestCase {
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
         nextResult = .success(tab("normal", "https://dev.azure.com/x", "Board"))
-        XCTAssertEqual(reader.activeTab(bundleID: edge), BrowserTab(url: "https://dev.azure.com/x", title: "Board"))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .tab(BrowserTab(url: "https://dev.azure.com/x", title: "Board")))
         XCTAssertEqual(executions, 1)
     }
 
-    func test_inPrivateWindow_givesNothing() {
+    func test_inPrivateWindow_isPrivateWindow() {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
         nextResult = .success(tab("incognito", "https://example.com", "Secret"))
-        XCTAssertNil(reader.activeTab(bundleID: edge))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .privateWindow)
     }
 
     func test_deniedPermission_stopsForGood() {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.denied)
-        XCTAssertNil(reader.activeTab(bundleID: edge))
-        XCTAssertNil(reader.activeTab(bundleID: edge))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
         XCTAssertEqual(requests, 1)
         XCTAssertEqual(executions, 0)
     }
@@ -77,8 +77,8 @@ final class BrowserTabReaderTests: XCTestCase {
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
         nextResult = .failure(AppleScriptError(number: -1743))
-        XCTAssertNil(reader.activeTab(bundleID: edge))
-        XCTAssertNil(reader.activeTab(bundleID: edge))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
         XCTAssertEqual(executions, 1)
     }
 
@@ -86,10 +86,28 @@ final class BrowserTabReaderTests: XCTestCase {
         let reader = makeReader()
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
-        nextResult = .failure(AppleScriptError(number: -1712))
-        XCTAssertNil(reader.activeTab(bundleID: edge))
+        nextResult = .failure(AppleScriptError(number: -1708))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
         nextResult = .success(tab("normal", "https://example.com", "Page"))
-        XCTAssertEqual(reader.activeTab(bundleID: edge)?.url, "https://example.com")
+        XCTAssertEqual(reader.activeTab(bundleID: edge),
+                       .tab(BrowserTab(url: "https://example.com", title: "Page")))
+        XCTAssertEqual(executions, 2)
+    }
+
+    func test_timeout_backsOffForTenCalls_thenExecutesAgain() {
+        let reader = makeReader()
+        _ = reader.activeTab(bundleID: edge)
+        pendingAnswer?(.granted)
+        nextResult = .failure(AppleScriptError(number: -1712))
+        XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
+        XCTAssertEqual(executions, 1)
+        nextResult = .success(tab("normal", "https://example.com", "Page"))
+        for _ in 0..<10 {
+            XCTAssertEqual(reader.activeTab(bundleID: edge), .unavailable)
+        }
+        XCTAssertEqual(executions, 1)
+        XCTAssertEqual(reader.activeTab(bundleID: edge),
+                       .tab(BrowserTab(url: "https://example.com", title: "Page")))
         XCTAssertEqual(executions, 2)
     }
 

@@ -104,6 +104,15 @@ struct SegmentBuilder {
     /// The fields of the segment this sample belongs to. `start` and `end` are set by the caller.
     private mutating func describe(_ s: ActivitySample, program: String) -> CapturedSegment {
         if Self.browserBundleIDs.contains(program) {
+            // Private windows and Safari keep no title, URL or window title.
+            if s.isPrivateWindow {
+                return CapturedSegment(start: 0, end: 0, type: .browser, program: program,
+                                       title: "Private window", path: nil, rawTitle: nil, enricher: nil)
+            }
+            if program == "com.apple.Safari" {
+                return CapturedSegment(start: 0, end: 0, type: .browser, program: program,
+                                       title: "Safari", path: nil, rawTitle: nil, enricher: nil)
+            }
             return CapturedSegment(start: 0, end: 0, type: .browser, program: program,
                                    title: s.tabTitle ?? s.windowTitle, path: s.url,
                                    rawTitle: s.windowTitle, enricher: nil)
