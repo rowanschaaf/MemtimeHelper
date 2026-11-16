@@ -93,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             logger.notice("Native capture started: \(CaptureStore.defaultURL.path, privacy: .public)")
         } catch {
             logger.error("Native capture failed to start: \(String(describing: error), privacy: .public)")
-            monitor.stop(because: "native capture could not start (\(error.localizedDescription))")
+            monitor.stop(because: "the capture store could not open (\(error.localizedDescription))")
         }
     }
 
@@ -105,6 +105,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                     logger.notice("Permission granted mid-flight — starting observer")
                     self.permissionTimer?.invalidate()
                     self.permissionTimer = nil
+                    self.appState.clearPermissionError()
                     self.startObserver()
                 }
             }

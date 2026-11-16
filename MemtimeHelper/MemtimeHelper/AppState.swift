@@ -42,9 +42,16 @@ final class AppState: ObservableObject {
         refreshStatus()
     }
 
+    private var permissionMissing = false
+
     func setPermissionError() {
-        statusMessage = "Accessibility permission needed"
-        statusIcon = "exclamationmark.circle"
+        permissionMissing = true
+        refreshStatus()
+    }
+
+    func clearPermissionError() {
+        permissionMissing = false
+        refreshStatus()
     }
 
     private func refreshStatus() {
@@ -59,6 +66,11 @@ final class AppState: ObservableObject {
             return
         case .capturing:
             break
+        }
+        if permissionMissing {
+            statusMessage = "Accessibility permission needed"
+            statusIcon = "exclamationmark.circle"
+            return
         }
         if !degradedApps.isEmpty {
             let names = degradedApps.values.sorted().joined(separator: ", ")

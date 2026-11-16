@@ -50,4 +50,34 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(state.statusMessage, "PAT: plan")
         XCTAssertEqual(state.statusIcon, "circle.fill")
     }
+
+    func test_stoppedCapture_isNotHiddenByLaterPermissionError() {
+        let state = AppState()
+        state.setCaptureStatus(.stopped("the capture store could not open"))
+        state.setPermissionError()
+        XCTAssertEqual(state.statusIcon, "xmark.octagon.fill")
+        XCTAssertTrue(state.statusMessage.contains("the capture store could not open"))
+    }
+
+    func test_permissionError_aloneShowsPermissionNeeded() {
+        let state = AppState()
+        state.setPermissionError()
+        XCTAssertEqual(state.statusMessage, "Accessibility permission needed")
+        XCTAssertEqual(state.statusIcon, "exclamationmark.circle")
+    }
+
+    func test_degradedCapture_outranksPermissionError() {
+        let state = AppState()
+        state.setPermissionError()
+        state.setCaptureStatus(.degraded([.accessibilityMissing]))
+        XCTAssertEqual(state.statusIcon, "exclamationmark.triangle.fill")
+        XCTAssertTrue(state.statusMessage.contains(CaptureHealth.Reason.accessibilityMissing.message))
+    }
+
+    func test_clearPermissionError_returnsToTheAppStatus() {
+        let state = AppState()
+        state.setPermissionError()
+        state.clearPermissionError()
+        XCTAssertEqual(state.statusMessage, "Monitoring — no active context")
+    }
 }
