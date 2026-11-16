@@ -19,6 +19,8 @@ struct ActivitySample: Equatable {
     /// What that extractor returned this tick; nil on a failed read.
     var extractedTitle: String? = nil
     var isLocked: Bool = false
+    /// True when the frontmost browser window is private; no title or URL is kept.
+    var isPrivateWindow: Bool = false
 }
 
 /// A span of one activity. `segments` rows are closed; the checkpoint row is open.

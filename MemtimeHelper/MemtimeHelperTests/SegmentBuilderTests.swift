@@ -83,6 +83,24 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertEqual(b.open?.title, "Edge — Board")
     }
 
+    func test_privateWindow_recordsNoTitleURLOrRawTitle() {
+        var b = SegmentBuilder()
+        var s = sample(100, edge, title: "Secret - InPrivate", url: "https://x", tab: "Secret")
+        s.isPrivateWindow = true
+        _ = b.ingest(s)
+        XCTAssertEqual(b.open, CapturedSegment(start: 100, end: 100, type: .browser, program: edge,
+                                               title: "Private window", path: nil,
+                                               rawTitle: nil, enricher: nil))
+    }
+
+    func test_safari_recordsOnlyProgramAndType() {
+        var b = SegmentBuilder()
+        _ = b.ingest(sample(100, "com.apple.Safari", title: "Some page", url: "https://x", tab: "Some page"))
+        XCTAssertEqual(b.open, CapturedSegment(start: 100, end: 100, type: .browser,
+                                               program: "com.apple.Safari", title: "Safari",
+                                               path: nil, rawTitle: nil, enricher: nil))
+    }
+
     func test_clockBackwards_neverOverlaps() {
         var b = SegmentBuilder()
         var closed = feed(&b, (100...110).map { sample($0) })

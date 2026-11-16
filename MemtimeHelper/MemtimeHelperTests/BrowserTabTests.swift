@@ -12,24 +12,28 @@ final class BrowserTabTests: XCTestCase {
 
     func test_normalWindow_givesURLAndTitle() {
         XCTAssertEqual(EdgeTab.parse(result(["normal", "https://dev.azure.com/x", "Board"])),
-                       BrowserTab(url: "https://dev.azure.com/x", title: "Board"))
+                       .tab(BrowserTab(url: "https://dev.azure.com/x", title: "Board")))
     }
 
-    func test_inPrivateWindow_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["incognito", "https://example.com", "Secret"])))
+    func test_inPrivateWindow_isPrivateWindow() {
+        XCTAssertEqual(EdgeTab.parse(result(["incognito", "https://example.com", "Secret"])), .privateWindow)
     }
 
-    func test_unknownMode_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["", "https://example.com", "Page"])))
+    func test_privateWindowWithEmptyFields_isPrivateWindow() {
+        XCTAssertEqual(EdgeTab.parse(result(["incognito", "", ""])), .privateWindow)
     }
 
-    func test_noWindow_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["", "", ""])))
+    func test_unknownMode_isUnavailable() {
+        XCTAssertEqual(EdgeTab.parse(result(["", "https://example.com", "Page"])), .unavailable)
+    }
+
+    func test_noWindow_isUnavailable() {
+        XCTAssertEqual(EdgeTab.parse(result(["", "", ""])), .unavailable)
     }
 
     func test_emptyTitle_givesNilTitle() {
         XCTAssertEqual(EdgeTab.parse(result(["normal", "https://example.com", ""])),
-                       BrowserTab(url: "https://example.com", title: nil))
+                       .tab(BrowserTab(url: "https://example.com", title: nil)))
     }
 
     func test_scriptReadsModeURLAndTitle_withTimeout() {
@@ -45,18 +49,18 @@ final class BrowserTabTests: XCTestCase {
     }
 
     func test_twoItemList_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["normal", "https://x"])))
+        XCTAssertEqual(EdgeTab.parse(result(["normal", "https://x"])), .unavailable)
     }
 
     func test_fourItemList_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["normal", "https://x", "T", "extra"])))
+        XCTAssertEqual(EdgeTab.parse(result(["normal", "https://x", "T", "extra"])), .unavailable)
     }
 
     func test_nonListDescriptor_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(NSAppleEventDescriptor(string: "normal")))
+        XCTAssertEqual(EdgeTab.parse(NSAppleEventDescriptor(string: "normal")), .unavailable)
     }
 
     func test_normalWindowWithEmptyURL_givesNothing() {
-        XCTAssertNil(EdgeTab.parse(result(["normal", "", "Title"])))
+        XCTAssertEqual(EdgeTab.parse(result(["normal", "", "Title"])), .unavailable)
     }
 }
