@@ -78,6 +78,8 @@ final class BrowserTabReaderTests: XCTestCase {
         reader.onDenied = { denials += 1 }
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.denied)
+        _ = reader.activeTab(bundleID: edge)
+        _ = reader.activeTab(bundleID: edge)
         XCTAssertEqual(denials, 1)
     }
 
@@ -88,6 +90,8 @@ final class BrowserTabReaderTests: XCTestCase {
         _ = reader.activeTab(bundleID: edge)
         pendingAnswer?(.granted)
         nextResult = .failure(AppleScriptError(number: -1743))
+        _ = reader.activeTab(bundleID: edge)
+        _ = reader.activeTab(bundleID: edge)
         _ = reader.activeTab(bundleID: edge)
         XCTAssertEqual(denials, 1)
     }
