@@ -9,12 +9,16 @@ protocol ActivitySampler {
 }
 
 /// Reads the frontmost app, its focused-window title, idle time and lock state.
-/// Browser URLs arrive in M3; until then `url` and `tabTitle` stay nil.
+/// For Edge it also reads the active tab's URL and title (never for a private
+/// window, and never for Safari).
 final class LiveActivitySampler: ActivitySampler {
     private let monitors: [String: AppMonitor]
+    private let tabReader: BrowserTabReading
 
-    init(monitors: [AppMonitor]) {
+    @MainActor
+    init(monitors: [AppMonitor], tabReader: BrowserTabReading? = nil) {
         self.monitors = Dictionary(uniqueKeysWithValues: monitors.map { ($0.bundleID, $0) })
+        self.tabReader = tabReader ?? BrowserTabReader.live()
     }
 
     /// Bundle ID -> extractor name, as written to the store's `enrichers` table
@@ -36,6 +40,12 @@ final class LiveActivitySampler: ActivitySampler {
         if let bundleID, let pid, let monitor = monitors[bundleID] {
             sample.enricherName = monitor.appDisplayName.lowercased()
             sample.extractedTitle = monitor.currentTitle(for: pid)
+        }
+        // CaptureEngine is @MainActor and calls sample() on the main thread.
+        if let bundleID,
+           let tab = MainActor.assumeIsolated({ tabReader.activeTab(bundleID: bundleID) }) {
+            sample.url = tab.url
+            sample.tabTitle = tab.title
         }
         return sample
     }
