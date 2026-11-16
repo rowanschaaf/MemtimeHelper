@@ -23,7 +23,7 @@
     <key>NSAccessibilityUsageDescription</key>
     <string>MemtimeHelper needs Accessibility access to read context from Claude and Outlook for time tracking.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>MemtimeHelper reads the address and title of the active Microsoft Edge tab to record what you work on. It skips InPrivate windows, and the data stays on this Mac.</string>
+    <string>MemtimeHelper reads the address and title of the active Microsoft Edge tab to record what you work on. It records nothing from InPrivate windows, and the data stays on this Mac.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>
