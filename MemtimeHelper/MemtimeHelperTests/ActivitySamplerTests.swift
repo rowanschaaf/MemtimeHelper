@@ -77,10 +77,28 @@ final class ActivitySamplerTests: XCTestCase {
         XCTAssertNil(s.tabTitle)
     }
 
-    func test_privacy_otherApp_untouched() {
+    func test_privacy_otherApp_normalTitle_untouched() {
+        var s = sample("com.example.app", title: "Doc notes")
+        LiveActivitySampler.applyBrowserPrivacy(&s, tab: .unavailable)
+        XCTAssertEqual(s.windowTitle, "Doc notes")
+        XCTAssertFalse(s.isPrivateWindow)
+    }
+
+    func test_privacy_chromeIncognito_isPrivateAndCleared() {
+        var s = sample("com.google.Chrome", title: "Secret - Google Chrome (Incognito)")
+        s.url = "https://leak"
+        s.tabTitle = "leak"
+        LiveActivitySampler.applyBrowserPrivacy(&s, tab: .unavailable)
+        XCTAssertTrue(s.isPrivateWindow)
+        XCTAssertNil(s.windowTitle)
+        XCTAssertNil(s.url)
+        XCTAssertNil(s.tabTitle)
+    }
+
+    func test_privacy_unknownAppWithInPrivateTitle_isPrivate() {
         var s = sample("com.example.app", title: "Doc (InPrivate) notes")
         LiveActivitySampler.applyBrowserPrivacy(&s, tab: .unavailable)
-        XCTAssertEqual(s.windowTitle, "Doc (InPrivate) notes")
-        XCTAssertFalse(s.isPrivateWindow)
+        XCTAssertTrue(s.isPrivateWindow)
+        XCTAssertNil(s.windowTitle)
     }
 }

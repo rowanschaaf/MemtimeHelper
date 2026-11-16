@@ -7,7 +7,8 @@ struct SegmentBuilder {
     static let idleThreshold: Int64 = 300
     static let carryForwardLimit: Int64 = 60
     static let maxSampleGap: Int64 = 10
-    static let browserBundleIDs: Set<String> = ["com.microsoft.edgemac", "com.apple.Safari"]
+    static let safariBundleID = "com.apple.Safari"
+    static let browserBundleIDs: Set<String> = ["com.microsoft.edgemac", safariBundleID, "com.google.Chrome"]
 
     private struct Extraction {
         let title: String
@@ -103,13 +104,14 @@ struct SegmentBuilder {
 
     /// The fields of the segment this sample belongs to. `start` and `end` are set by the caller.
     private mutating func describe(_ s: ActivitySample, program: String) -> CapturedSegment {
+        // A private window keeps no title, URL or window title, in any program.
+        if s.isPrivateWindow {
+            return CapturedSegment(start: 0, end: 0, type: Self.browserBundleIDs.contains(program) ? .browser : .app,
+                                   program: program, title: "Private window", path: nil, rawTitle: nil, enricher: nil)
+        }
         if Self.browserBundleIDs.contains(program) {
-            // Private windows and Safari keep no title, URL or window title.
-            if s.isPrivateWindow {
-                return CapturedSegment(start: 0, end: 0, type: .browser, program: program,
-                                       title: "Private window", path: nil, rawTitle: nil, enricher: nil)
-            }
-            if program == "com.apple.Safari" {
+            // Safari keeps no titles at all.
+            if program == Self.safariBundleID {
                 return CapturedSegment(start: 0, end: 0, type: .browser, program: program,
                                        title: "Safari", path: nil, rawTitle: nil, enricher: nil)
             }
