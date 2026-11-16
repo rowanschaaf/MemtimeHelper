@@ -61,6 +61,8 @@ MemtimeHelper/                    ← Xcode project root
     SingleWriterLock.swift        ← flock on capture.lock; one capture writer per store
     SegmentBuilder.swift          ← Pure segment rules 1–9 (see TimesheetHelper spec 2026-10-05)
     ActivitySampler.swift         ← Sampler protocol + live sampler (frontmost app, AX title, idle, lock)
+    BrowserTab.swift              ← EdgeTab.parse: tab text -> URL and title; requires window mode "normal"
+    BrowserTabReader.swift        ← @MainActor Edge tab reader (compiled AppleScript, Automation grant)
     CaptureEngine.swift           ← 1 s timer, 30 s checkpoint, write queue, sleep/lock events
 
     AXTreeDumper.swift            ← Diagnostic; menu item dumps full AX tree to ~/Desktop
@@ -124,6 +126,8 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 **Single writer to capture.db:** `capture.lock` beside `capture.db` is flock'd (`O_CLOEXEC`) for the process lifetime, and capture is skipped under XCTest (`XCTestConfigurationFilePath`). A second writer would recover the live checkpoint at start and duplicate billable time. The Memtime writer (`WorkspaceObserver`) is skipped under XCTest too, so the test host never writes `core.db`.
 
 **Checkpoint discipline:** `CaptureStore.insert` deletes the checkpoint row. The engine therefore re-checkpoints the open segment after every successful insert, and never writes `checkpoint(nil)` while segments are queued in `pending`. Dropping either breaks the "a crash loses 30 s at most" bound.
+
+**Browser URLs need Automation; private windows are never read:** `BrowserTabReader` is `@MainActor`. It runs one compiled AppleScript on the main thread inside the tick. The sampler is not isolated, so it calls the reader with `MainActor.assumeIsolated`. This is safe because `CaptureEngine` is `@MainActor` and calls `sample()` on the main thread. The script is bounded by `with timeout of 1 second`. It returns an empty URL and title unless `mode of w is "normal"`, so private data never leaves Edge. `EdgeTab.parse` also requires mode "normal" and drops any other window. The reader first asks for the Automation grant with `AEDeterminePermissionToAutomateTarget` on a background queue. An Apple Event sent while the consent prompt is open blocks the main thread. A denial (`-1743`) stops Edge reads for the process lifetime. Failures surface as `AppleScriptError`. Safari URLs are not recorded: AppleScript gives no way to tell a private Safari window from a normal one (checked 2026-11-17). See the M3 plan, Task 1.
 
 **AX timeouts:** `AppDelegate` sets a global 1.0 s messaging timeout on the system-wide element at launch, so the Claude/Outlook extractors (which create their own elements) cannot hang on an unresponsive app. `LiveActivitySampler.focusedWindowTitle` sets 0.5 s on its own two reads. A hung app must not stall a 1 s tick past the 10 s gap rule, which would split the segment.
 
