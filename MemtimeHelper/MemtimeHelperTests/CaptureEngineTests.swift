@@ -88,6 +88,33 @@ final class CaptureEngineTests: XCTestCase {
         XCTAssertEqual(changes, [true, false])
     }
 
+    func test_onWritesFailingChanged_firesOnceAcrossRepeatedFailures() {
+        let sampler = FakeSampler()
+        sampler.queue = [sample(100), sample(101, title: "B"), sample(102, title: "C"),
+                         sample(103, title: "D"), sample(104, title: "E"), sample(105, title: "E")]
+        let writer = FakeWriter()
+        writer.failInserts = 1000
+        let engine = CaptureEngine(sampler: sampler, store: writer)
+        var changes: [Bool] = []
+        engine.onWritesFailingChanged = { changes.append($0) }
+        for _ in 0..<5 { engine.tick() }      // a segment closes on four ticks, each insert fails
+        XCTAssertEqual(changes, [true])
+        writer.failInserts = 0
+        engine.tick()
+        XCTAssertEqual(changes, [true, false])
+    }
+
+    func test_interrupt_doesNotCallOnSample() {
+        let sampler = FakeSampler()
+        sampler.queue = [sample(100)]
+        let engine = CaptureEngine(sampler: sampler, store: FakeWriter())
+        var seen = 0
+        engine.onSample = { _ in seen += 1 }
+        engine.tick()
+        engine.interrupt(at: 101)
+        XCTAssertEqual(seen, 1)
+    }
+
     /// `CaptureStore.insert` deletes the checkpoint row, so a retry that lands
     /// after the open segment was checkpointed must write that checkpoint again.
     func test_successfulRetry_recheckpointsTheOpenSegment() {
