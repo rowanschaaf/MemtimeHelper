@@ -117,6 +117,8 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 
 **Bounded carry-forward:** a nil extractor read keeps the last good title for at most 60 s (rule 4), then falls back to the window title with `enricher` NULL (rule 5). Lengthening the limit hides extractor outages — the September 2026 Claude outage ran 28 days unnoticed.
 
+**Interruptions close at the last input:** sleep, display sleep, screen lock, user switch, the first locked sample and a gap of more than 10 s all end an active segment at the last keyboard or mouse input (`SegmentBuilder.closeAtLastInput`), not at the event. Display sleep and auto-lock only fire after idle, so closing at the event books that idle as work. An open `offline` segment still ends at the event. Do not change these closes back to the event time.
+
 **Segments from one engine never overlap:** `SegmentBuilder` keeps a monotone start floor, so a backwards clock or an interrupt stamped before the last sample can never start a segment before the previous one ended. Do not reset the floor to an earlier time; that reintroduces double-counted time.
 
 **Single writer to capture.db:** `capture.lock` beside `capture.db` is flock'd (`O_CLOEXEC`) for the process lifetime, and capture is skipped under XCTest (`XCTestConfigurationFilePath`). A second writer would recover the live checkpoint at start and duplicate billable time. The Memtime writer (`WorkspaceObserver`) is skipped under XCTest too, so the test host never writes `core.db`.

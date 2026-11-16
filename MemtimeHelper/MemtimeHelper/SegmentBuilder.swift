@@ -18,6 +18,8 @@ struct SegmentBuilder {
     /// The segment in progress. The engine checkpoints it every 30 s.
     private(set) var open: CapturedSegment?
     private var lastSampleTime: Int64?
+    /// The last keyboard or mouse input seen, from the latest sample.
+    private var lastInputTime: Int64?
     /// The earliest time a new segment may start, so segments never overlap.
     private var floor: Int64?
     private var lastExtraction: [String: Extraction] = [:]
@@ -28,19 +30,19 @@ struct SegmentBuilder {
         // Rules 6 and 7: a long gap or a backwards clock ends the open segment
         // at the last sample. This does not depend on sleep notifications.
         if let last = lastSampleTime, s.time < last || s.time - last > Self.maxSampleGap {
-            closed += close(at: last)
+            closed += closeAtLastInput(event: last, lastInput: lastInputTime)
             raiseFloor(to: s.time)
         }
         lastSampleTime = s.time
+        let lastInput = s.time - s.idleSeconds
+        lastInputTime = lastInput
 
         // Rule 9: no segment while the screen is locked.
         if s.isLocked {
-            closed += close(at: s.time)
+            closed += closeAtLastInput(event: s.time, lastInput: lastInput)
             raiseFloor(to: s.time)
             return closed
         }
-
-        let lastInput = s.time - s.idleSeconds
 
         // Rules 2 and 3: idle time becomes an offline segment.
         if s.idleSeconds >= Self.idleThreshold {
@@ -82,11 +84,21 @@ struct SegmentBuilder {
         return closed
     }
 
-    /// Rule 8: sleep, screen lock and user switch end the open segment at the event time.
+    /// Rule 8: sleep, screen lock and user switch end the open segment at the last
+    /// input before the event.
     mutating func interrupt(at time: Int64) -> [CapturedSegment] {
-        let closed = close(at: time)
+        let closed = closeAtLastInput(event: time, lastInput: lastInputTime)
         raiseFloor(to: time)
         return closed
+    }
+
+    /// Rules 6, 8 and 9: an interruption ends an active segment at the last input,
+    /// so idle time before display sleep or a lock is not booked as work. An
+    /// offline segment already ends at the input that ended the idle period, so
+    /// it ends at the event.
+    private mutating func closeAtLastInput(event: Int64, lastInput: Int64?) -> [CapturedSegment] {
+        guard open?.type != .offline, let lastInput else { return close(at: event) }
+        return close(at: min(event, lastInput))
     }
 
     /// The fields of the segment this sample belongs to. `start` and `end` are set by the caller.

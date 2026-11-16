@@ -253,13 +253,46 @@ final class SegmentBuilderTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(open.end, open.start)
     }
 
-    func test_rule8_interrupt_closesAtEventTime() {
+    func test_rule8_interrupt_closesAtLastInput() {
         var b = SegmentBuilder()
+        // Last input at 105; samples to 120 are idle; display sleep fires at 121.
         _ = feed(&b, (100...105).map { sample($0) })
-        // The event time (108) is later than the last sample (105), so closing at
-        // the last sample would give a different end.
-        XCTAssertEqual(b.interrupt(at: 108), [appSegment(100, 108)])
+        _ = feed(&b, (106...120).map { sample($0, idle: $0 - 105) })
+        XCTAssertEqual(b.interrupt(at: 121), [appSegment(100, 105)])
         XCTAssertNil(b.open)
+    }
+
+    func test_rule8_interrupt_withNoIdle_keepsTheSegmentToTheLastSample() {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...120).map { sample($0) })
+        XCTAssertEqual(b.interrupt(at: 120), [appSegment(100, 120)])
+    }
+
+    func test_rule8_interrupt_whileOffline_closesAtTheEvent() {
+        var b = SegmentBuilder()
+        _ = feed(&b, (100...110).map { sample($0) })
+        _ = feed(&b, (111...420).map { sample($0, idle: $0 - 110) })
+        let closed = b.interrupt(at: 421)
+        XCTAssertEqual(closed.map(\.type), [.offline])
+        XCTAssertEqual(closed.first?.end, 421)
+    }
+
+    func test_rule9_firstLockedSample_closesAtLastInput() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += feed(&b, (106...115).map { sample($0, idle: $0 - 105) })
+        closed += b.ingest(sample(116, idle: 11, locked: true))
+        XCTAssertEqual(closed, [appSegment(100, 105)])
+        XCTAssertNil(b.open)
+    }
+
+    func test_rule6_gap_closesAtLastInput() {
+        var b = SegmentBuilder()
+        var closed = feed(&b, (100...105).map { sample($0) })
+        closed += feed(&b, (106...110).map { sample($0, idle: $0 - 105) })
+        closed += b.ingest(sample(200))
+        XCTAssertEqual(closed, [appSegment(100, 105)])
+        XCTAssertEqual(b.open, appSegment(200, 200))
     }
 
     func test_rule9_locked_opensNoSegment() {
