@@ -63,7 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             return
         }
         let monitor = CaptureHealthMonitor(
-            extractors: Dictionary(uniqueKeysWithValues: monitors.map { ($0.bundleID, $0.appDisplayName) }),
+            extractors: CaptureHealthMonitor.healthCheckedExtractors(monitors),
             threshold: TitleHealth.configuredThreshold())
         monitor.onChange = { [weak self] status in
             self?.appState.setCaptureStatus(status)
