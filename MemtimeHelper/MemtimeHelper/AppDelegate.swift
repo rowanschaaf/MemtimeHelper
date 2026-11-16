@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private lazy var observer = WorkspaceObserver(monitors: monitors)
     private var captureEngine: CaptureEngine?
     private var captureLock: SingleWriterLock?
+    private var healthMonitor: CaptureHealthMonitor?
     private var cancellables = Set<AnyCancellable>()
     private var permissionTimer: Timer?
 
@@ -61,23 +62,38 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             logger.notice("Running under XCTest; native capture not started")
             return
         }
+        let monitor = CaptureHealthMonitor(
+            extractors: Dictionary(uniqueKeysWithValues: monitors.map { ($0.bundleID, $0.appDisplayName) }),
+            threshold: TitleHealth.configuredThreshold())
+        monitor.onChange = { [weak self] status in
+            self?.appState.setCaptureStatus(status)
+            if case .stopped(let reason) = status { Self.postStoppedAlert(reason: reason) }
+        }
+        monitor.onTitleAlert = { appName in Self.postHealthAlert(appName: appName) }
+        healthMonitor = monitor
         do {
             let directory = CaptureStore.defaultURL.deletingLastPathComponent()
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
             guard let lock = SingleWriterLock(url: directory.appendingPathComponent("capture.lock")) else {
                 logger.error("Another MemtimeHelper instance owns the capture store; native capture not started")
+                monitor.stop(because: "another MemtimeHelper instance owns the capture store")
                 return
             }
             captureLock = lock
             let store = try CaptureStore(url: CaptureStore.defaultURL)
             try store.replaceEnrichers(LiveActivitySampler.enricherNames(for: monitors))
-            let engine = CaptureEngine(sampler: LiveActivitySampler(monitors: monitors), store: store)
+            let reader = BrowserTabReader.live()
+            reader.onDenied = { [weak monitor] in monitor?.setAutomationDenied(browser: "Microsoft Edge") }
+            let engine = CaptureEngine(sampler: LiveActivitySampler(monitors: monitors, tabReader: reader), store: store)
+            engine.onSample = { [weak monitor] sample in monitor?.record(sample, at: Date()) }
+            engine.onWritesFailingChanged = { [weak monitor] failing in monitor?.setWritesFailing(failing) }
             engine.start()
             captureEngine = engine
             logger.notice("Native capture started: \(CaptureStore.defaultURL.path, privacy: .public)")
         } catch {
             logger.error("Native capture failed to start: \(String(describing: error), privacy: .public)")
+            monitor.stop(because: "native capture could not start (\(error.localizedDescription))")
         }
     }
 
@@ -98,15 +114,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func startObserver() {
         observer.onTitleChange = { [weak self] bundleID, title in
             self?.appState.setActive(bundleID: bundleID, title: title)
-        }
-        observer.onHealthEvent = { [weak self] monitor, event in
-            switch event {
-            case .alert:
-                self?.appState.setDegraded(bundleID: monitor.bundleID, appName: monitor.appDisplayName)
-                Self.postHealthAlert(appName: monitor.appDisplayName)
-            case .recovered:
-                self?.appState.clearDegraded(bundleID: monitor.bundleID)
-            }
         }
         observer.start()
     }
@@ -129,6 +136,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             content.body = "No \(appName) conversation title read in \(duration) of use. \(appName)'s layout may have changed. "
                 + "Open the MemtimeHelper menu (warning triangle in the menu bar) → Dump Claude AX Tree…"
             center.add(UNNotificationRequest(identifier: "title-health-\(appName)", content: content, trigger: nil))
+        }
+    }
+
+    /// Posts when capture stops for good. Nothing is recorded until the app restarts,
+    /// so the menu bar icon alone is too easy to miss.
+    private static func postStoppedAlert(reason: String) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            guard granted else {
+                logger.notice("Notification permission not granted: \(error?.localizedDescription ?? "denied", privacy: .public)")
+                return
+            }
+            let content = UNMutableNotificationContent()
+            content.title = "Native capture has stopped"
+            content.body = "\(reason.prefix(1).uppercased() + reason.dropFirst()). Time is not being recorded until MemtimeHelper restarts."
+            center.add(UNNotificationRequest(identifier: "capture-stopped", content: content, trigger: nil))
         }
     }
 

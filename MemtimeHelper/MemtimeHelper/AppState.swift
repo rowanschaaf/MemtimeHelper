@@ -9,6 +9,14 @@ final class AppState: ObservableObject {
     /// Apps whose title reads have failed long enough to alert (see `TitleHealth`).
     @Published private(set) var degradedApps: [String: String] = [:]  // bundleID → app name
 
+    /// Native capture health (see `CaptureHealthMonitor`); takes precedence over the app status.
+    @Published private(set) var captureStatus: CaptureHealth.Status = .capturing
+
+    func setCaptureStatus(_ status: CaptureHealth.Status) {
+        captureStatus = status
+        refreshStatus()
+    }
+
     func setActive(bundleID: String, title: String?) {
         if let title {
             appStatuses[bundleID] = title
@@ -40,6 +48,18 @@ final class AppState: ObservableObject {
     }
 
     private func refreshStatus() {
+        switch captureStatus {
+        case .stopped(let reason):
+            statusMessage = "Native capture stopped: \(reason)"
+            statusIcon = "xmark.octagon.fill"
+            return
+        case .degraded(let reasons):
+            statusMessage = reasons.map(\.message).joined(separator: "\n")
+            statusIcon = "exclamationmark.triangle.fill"
+            return
+        case .capturing:
+            break
+        }
         if !degradedApps.isEmpty {
             let names = degradedApps.values.sorted().joined(separator: ", ")
             statusMessage = "\(names): no title read — layout may have changed. Use Dump Claude AX Tree…"
