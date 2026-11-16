@@ -4,12 +4,15 @@ import os
 
 private let logger = Logger(subsystem: "com.memtimehelper.MemtimeHelper", category: "BrowserTabReader")
 
+@MainActor
 protocol BrowserTabReading {
     func activeTab(bundleID: String) -> BrowserTab?
 }
 
-/// The AppleScript error number travels as the `Result` failure value.
-extension Int: @retroactive Error {}
+/// The AppleScript error number, carried as the `Result` failure value.
+struct AppleScriptError: Error, Equatable {
+    let number: Int
+}
 
 enum AutomationPermission: Equatable {
     case granted, denied, unavailable
@@ -18,17 +21,18 @@ enum AutomationPermission: Equatable {
 /// Reads the active Edge tab through AppleScript, on the caller's (main) thread.
 /// It never sends an Apple Event until the Automation grant is known: an event
 /// sent while the consent prompt is open would block the main thread.
+@MainActor
 final class BrowserTabReader: BrowserTabReading {
     private enum State { case unknown, requesting, granted, denied }
 
     private static let notPermitted = -1743
 
     private let requestPermission: (String, @escaping (AutomationPermission) -> Void) -> Void
-    private let execute: () -> Result<NSAppleEventDescriptor, Int>
+    private let execute: () -> Result<NSAppleEventDescriptor, AppleScriptError>
     private var state = State.unknown
 
     init(requestPermission: @escaping (String, @escaping (AutomationPermission) -> Void) -> Void,
-         execute: @escaping () -> Result<NSAppleEventDescriptor, Int>) {
+         execute: @escaping () -> Result<NSAppleEventDescriptor, AppleScriptError>) {
         self.requestPermission = requestPermission
         self.execute = execute
     }
@@ -48,8 +52,8 @@ final class BrowserTabReader: BrowserTabReading {
             switch execute() {
             case .success(let result):
                 return EdgeTab.parse(result)
-            case .failure(let code):
-                if code == Self.notPermitted {
+            case .failure(let error):
+                if error.number == Self.notPermitted {
                     state = .denied
                     logger.error("Automation for Edge was revoked; Edge URLs are no longer captured")
                 }
@@ -89,11 +93,11 @@ final class BrowserTabReader: BrowserTabReading {
                 }
             },
             execute: {
-                guard let script else { return .failure(-2700) }
+                guard let script else { return .failure(AppleScriptError(number: -2700)) }
                 var error: NSDictionary?
                 let result = script.executeAndReturnError(&error)
                 if let error {
-                    return .failure(error[NSAppleScript.errorNumber] as? Int ?? -2700)
+                    return .failure(AppleScriptError(number: error[NSAppleScript.errorNumber] as? Int ?? -2700))
                 }
                 return .success(result)
             })
