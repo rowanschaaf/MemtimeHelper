@@ -39,9 +39,9 @@ MemtimeHelper also records its own activity timeline to `~/Library/Application S
 
 The menu bar icon shows the health of native capture. If more than one state applies, the first in this list wins.
 
-- **Stopped** (octagon icon): native capture did not start, or has stopped. For example, a second MemtimeHelper instance owns the capture store, or the store did not open. A "Native capture has stopped" notification appears.
-- **Degraded** (warning triangle): capture runs, but part of it is not working. The menu lists each cause: Accessibility permission missing, Automation denied for Microsoft Edge, titles not read for Claude, or segments not saved to the store. The title cause also posts a "titles are not being tracked" notification.
-- **Accessibility permission needed**: the permission is not yet granted.
+- **Stopped** (octagon icon): native capture did not start. For example, a second MemtimeHelper instance owns the capture store, or the store could not start. The menu shows the cause. A "Native capture has stopped" notification appears.
+- **Degraded** (warning triangle): capture runs, but part of it is not working. The menu lists each cause: Accessibility permission missing, Automation denied for Microsoft Edge, titles not read for Claude, or segments not saved to the store. The title cause also posts a "titles are not being tracked" notification. While the Accessibility permission is missing, the title check does not run.
+- **Accessibility permission needed**: the permission is not yet granted. This shows only until the first capture sample. After that, Degraded reports the missing permission.
 - **App titles**: capture is healthy. The menu shows the title of each monitored app that is in use.
 
 Each Claude conversation pane has one anchor element, and the title is read relative to it. Claude 2.19675.0 anchors on the title button itself (`AXButton desc="{title}, rename session"`). Older versions used an `AXPopUpButton desc="Session actions"` popup. Claude changes this layout without notice. [CLAUDE.md](CLAUDE.md) records each layout and how to re-derive the anchor.
