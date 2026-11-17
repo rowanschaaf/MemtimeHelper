@@ -41,6 +41,16 @@ final class CaptureHealthMonitorTests: XCTestCase {
         XCTAssertEqual(statuses, [.degraded([.accessibilityMissing]), .capturing])
     }
 
+    /// Without Accessibility no title can be read, so a title alert would blame
+    /// a layout change for a missing permission.
+    func test_missingAccessibility_suppressesTheTitleAlert() {
+        let m = makeMonitor(threshold: 10)
+        granted = false
+        for t in Int64(100)...115 { m.record(claudeSample(t, title: nil), at: at(t)) }
+        XCTAssertEqual(m.status, .degraded([.accessibilityMissing]))
+        XCTAssertEqual(alerts, [])
+    }
+
     func test_titlesNotRead_afterThreshold_alertsOnce() {
         let m = makeMonitor(threshold: 10)
         for t in Int64(100)...115 { m.record(claudeSample(t, title: nil), at: at(t)) }
