@@ -28,8 +28,10 @@ final class CaptureHealthMonitor {
     }
 
     func record(_ sample: ActivitySample, at now: Date) {
-        health.set(.accessibilityMissing, active: !isAccessibilityGranted())
-        for (program, app) in extractors {
+        let granted = isAccessibilityGranted()
+        health.set(.accessibilityMissing, active: !granted)
+        // Without Accessibility no title can be read; the permission reason covers it.
+        for (program, app) in extractors where granted {
             let frontmost = sample.bundleID == program && !sample.isLocked
             let title = frontmost ? sample.extractedTitle : nil
             switch titleHealth[program]?.record(title: title, frontmost: frontmost, at: now) {
