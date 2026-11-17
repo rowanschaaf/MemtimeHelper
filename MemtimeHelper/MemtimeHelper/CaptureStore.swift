@@ -4,8 +4,14 @@ import SQLite3
 /// SQLITE_TRANSIENT tells SQLite to copy a bound string immediately.
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-enum CaptureStoreError: Error, Equatable {
+enum CaptureStoreError: LocalizedError, Equatable {
     case sqlite(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .sqlite(let message): return message
+        }
+    }
 }
 
 /// Owns capture.db: the store TimesheetHelper reads in native mode.
