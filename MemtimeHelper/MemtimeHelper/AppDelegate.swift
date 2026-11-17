@@ -93,7 +93,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             logger.notice("Native capture started: \(CaptureStore.defaultURL.path, privacy: .public)")
         } catch {
             logger.error("Native capture failed to start: \(String(describing: error), privacy: .public)")
-            monitor.stop(because: "the capture store could not open (\(error.localizedDescription))")
+            monitor.stop(because: "the capture store could not start (\(error.localizedDescription))")
         }
     }
 

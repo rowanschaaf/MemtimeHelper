@@ -133,4 +133,9 @@ final class CaptureStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.recoverCheckpoint())
         XCTAssertEqual(try store.segments(), [])
     }
+
+    /// The Stopped message shows this text, so it must carry SQLite's message.
+    func test_storeError_describesTheSQLiteMessage() {
+        XCTAssertEqual(CaptureStoreError.sqlite("disk I/O error").localizedDescription, "disk I/O error")
+    }
 }
