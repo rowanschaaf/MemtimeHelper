@@ -75,7 +75,7 @@ MemtimeHelper/                    ← Xcode project root
 docs/plans/                       ← Design + implementation notes
 ```
 
-Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for:)`. If non-nil, it either `update`s the open `TTracking` row's title or — when the title differs from the last write — calls `splitSegment` to atomically close the open row and insert a fresh one with the new title.
+Data flow: every 1s, `WorkspaceObserver` first reconciles its tracked PIDs against the running apps, then polls each `AppMonitor.currentTitle(for:)`. If non-nil, it either `update`s the open `TTracking` row's title or — when the title differs from the last write — calls `splitSegment` to atomically close the open row and insert a fresh one with the new title.
 
 ## Gotchas
 
@@ -94,6 +94,8 @@ Data flow: every 1s, `WorkspaceObserver` polls each `AppMonitor.currentTitle(for
 **Bundle ID:** Claude.app bundle identifier is `com.anthropic.claudefordesktop` (NOT `com.anthropic.claude`).
 
 **Enhanced AX every poll:** `ClaudeMonitor` re-sends `AXEnhancedUserInterface` and `AXManualAccessibility` on the application AX element on every call. Setting these once per pid (the previous approach) routinely produced stub trees and persistent nil reads when Claude backgrounded or window state churned. Don't reintroduce a one-shot guard.
+
+**Observer follows relaunch:** `WorkspaceObserver` does not trust launch/terminate notifications alone. An auto-update relaunch of Claude on 2026-11-19 12:31 delivered no launch event, so the observer skipped Claude for hours and Memtime logged bare "Claude". Every poll calls `reconcileRunningApps()`, which adopts a new or changed PID and gives a vanished app the terminate side effects. The 1 s timer runs for the observer's lifetime, even with no monitored app running, so a launch with a missed notification is found within one poll. Do not stop the timer when `activeApps` is empty. The PID lookup is injected (`runningPID`) for tests.
 
 **Don't write on nil:** `WorkspaceObserver` skips DB writes when a monitor returns nil. A nil read is almost always a transient AX hiccup (backgrounded window, mid-transition). Writing the bare app name as fallback overwrites the last good title and segments cleanly into garbage.
 
