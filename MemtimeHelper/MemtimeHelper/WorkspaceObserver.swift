@@ -10,7 +10,9 @@ final class WorkspaceObserver {
     private let monitors: [AppMonitor]
     private let updater = WindowTitleUpdater()
     private var trackers: [String: ConversationTracker] = [:]
-    private var activeApps: [String: pid_t] = [:]
+    /// Running PID per monitored bundleID. Kept in step by the launch and
+    /// terminate notifications and, as the authority, by `reconcileRunningApps()`.
+    private(set) var activeApps: [String: pid_t] = [:]
     /// Last title we successfully wrote to Memtime, per bundleID. Drives the
     /// row-split decision: when this differs from a fresh non-nil read, we
     /// close the open row and insert a new one so time is segmented per
@@ -20,6 +22,10 @@ final class WorkspaceObserver {
     /// `expectsTitleWhenFrontmost`.
     private var health: [String: TitleHealth] = [:]
     private var timer: Timer?
+    /// Looks up the running PID for a bundleID. Injected so tests need no live apps.
+    private let runningPID: (String) -> pid_t?
+
+    var isPolling: Bool { timer != nil }
 
     /// Called when any monitored app's title changes. Parameters: (bundleID, title).
     var onTitleChange: ((String, String?) -> Void)?
@@ -27,8 +33,15 @@ final class WorkspaceObserver {
     /// Called when a monitor's title health alerts or recovers.
     var onHealthEvent: ((AppMonitor, TitleHealth.Event) -> Void)?
 
-    init(monitors: [AppMonitor]) {
+    init(
+        monitors: [AppMonitor],
+        runningPID: @escaping (String) -> pid_t? = { bundleID in
+            NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                .first(where: { !$0.isTerminated })?.processIdentifier
+        }
+    ) {
         self.monitors = monitors
+        self.runningPID = runningPID
         let threshold = TitleHealth.configuredThreshold()
         for m in monitors {
             trackers[m.bundleID] = ConversationTracker()
@@ -52,19 +65,12 @@ final class WorkspaceObserver {
             object: nil
         )
 
-        // Check which monitored apps are already running
-        for monitor in monitors {
-            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: monitor.bundleID).first {
-                activeApps[monitor.bundleID] = app.processIdentifier
-                logger.notice("\(monitor.appDisplayName, privacy: .public) already running (PID \(app.processIdentifier))")
-            }
-        }
-
-        if !activeApps.isEmpty {
-            startPolling()
-        } else {
-            logger.notice("No monitored apps running — waiting")
-        }
+        // Adopt apps that are already running, then poll for the lifetime of
+        // the observer. The timer never stops: each poll reconciles against the
+        // running apps, so it also catches an app that launches while no
+        // notification arrives.
+        reconcileRunningApps()
+        startPolling()
     }
 
     func stop() {
@@ -83,22 +89,51 @@ final class WorkspaceObserver {
         let displayName = monitors.first(where: { $0.bundleID == bundleID })?.appDisplayName ?? bundleID
         logger.notice("\(displayName, privacy: .public) launched (PID \(app.processIdentifier))")
         activeApps[bundleID] = app.processIdentifier
-
-        if timer == nil { startPolling() }
     }
 
     @objc private func appDidTerminate(_ notification: Notification) {
         guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let bundleID = app.bundleIdentifier,
-              activeApps.removeValue(forKey: bundleID) != nil else { return }
+              activeApps[bundleID] != nil else { return }
+        // A relaunch can deliver the old instance's terminate after the new
+        // instance is running. Keep tracking the new one.
+        if let current = runningPID(bundleID), current != app.processIdentifier {
+            activeApps[bundleID] = current
+            return
+        }
+        removeApp(bundleID, reason: "terminated")
+    }
 
+    /// Aligns `activeApps` with the apps that are actually running. Covers a
+    /// relaunch (for example an auto-update) or an exit whose notification
+    /// never arrived. A new or changed PID is adopted; a missing app gets the
+    /// same side effects as a terminate notification.
+    func reconcileRunningApps() {
+        for monitor in monitors {
+            let id = monitor.bundleID
+            let known = activeApps[id]
+            switch (known, runningPID(id)) {
+            case let (nil, pid?):
+                activeApps[id] = pid
+                logger.notice("\(monitor.appDisplayName, privacy: .public) found running (PID \(pid))")
+            case let (old?, pid?) where old != pid:
+                activeApps[id] = pid
+                logger.notice("\(monitor.appDisplayName, privacy: .public) relaunched (PID \(old) → \(pid))")
+            case (_?, nil):
+                removeApp(id, reason: "not running (no terminate notification)")
+            default:
+                break
+            }
+        }
+    }
+
+    private func removeApp(_ bundleID: String, reason: String) {
+        guard activeApps.removeValue(forKey: bundleID) != nil else { return }
         let displayName = monitors.first(where: { $0.bundleID == bundleID })?.appDisplayName ?? bundleID
-        logger.notice("\(displayName, privacy: .public) terminated")
+        logger.notice("\(displayName, privacy: .public) \(reason, privacy: .public)")
         trackers[bundleID]?.record(nil)
         lastWrittenTitles.removeValue(forKey: bundleID)
         onTitleChange?(bundleID, nil)
-
-        if activeApps.isEmpty { stopPolling() }
     }
 
     private func startPolling() {
@@ -119,6 +154,7 @@ final class WorkspaceObserver {
 
     private func poll() {
         pollCount += 1
+        reconcileRunningApps()
 
         for monitor in monitors {
             guard let pid = activeApps[monitor.bundleID] else { continue }
