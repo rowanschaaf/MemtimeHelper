@@ -27,6 +27,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // A signed Debug test host shares the installed app's identity and
+        // Accessibility grant. It must not register a login item, write the
+        // live capture store or start the Memtime writer.
+        guard !LaunchEnvironment.isTestHost() else {
+            logger.notice("Running as XCTest host — skipping start-up")
+            return
+        }
         UNUserNotificationCenter.current().delegate = self
         registerLoginItemIfNeeded()
         // A hung frontmost app must not stall a 1 s tick past the 10 s gap rule; this global
@@ -34,10 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 1.0)
         startCapture()
 
-        // The test host is a second process; it must not write Memtime's core.db.
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            logger.notice("Running under XCTest; Memtime writer not started")
-        } else if AccessibilityPermission.isGranted {
+        if AccessibilityPermission.isGranted {
             logger.notice("AX permission granted — starting observer")
             startObserver()
         } else {
@@ -57,11 +61,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // MARK: - Private
 
     private func startCapture() {
-        // The test host is a second process; it must not write the live store.
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            logger.notice("Running under XCTest; native capture not started")
-            return
-        }
         let monitor = CaptureHealthMonitor(
             extractors: CaptureHealthMonitor.healthCheckedExtractors(monitors),
             threshold: TitleHealth.configuredThreshold())

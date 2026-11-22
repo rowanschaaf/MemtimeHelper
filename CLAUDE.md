@@ -42,6 +42,7 @@ MemtimeHelper/                    ← Xcode project root
     MemtimeHelperApp.swift        ← @main, MenuBarExtra scene
     AppDelegate.swift             ← Lifecycle, login item, starts WorkspaceObserver and CaptureEngine
     AccessibilityPermission.swift ← AXIsProcessTrusted wrapper
+    LaunchEnvironment.swift       ← Detects the XCTest host (skips start-up)
 
     AppMonitor.swift              ← Protocol all monitored apps conform to
     ClaudeMonitor.swift           ← Reads Claude conversation title from AX tree
@@ -87,6 +88,8 @@ Data flow: every 1s, `WorkspaceObserver` first reconciles its tracked PIDs again
 
 **Pin the certificate by name, never by hash:** The Accessibility (TCC) grant follows the app's designated requirement, which matches on the certificate CN. A renewed certificate keeps the CN, so a name pin survives renewal. A SHA-1 hash pin does not: it broke the build once, when the pinned certificate expired. A build signed ad-hoc or by a different certificate loses the grant. Compare `codesign -d -r- <built.app>` with the installed app before you replace it.
 
+**Test host skips start-up:** `MemtimeHelperTests` uses the app as its test host. With `Signing.local.xcconfig`, the Debug test host has the installed app's bundle ID and designated requirement, so it inherits the Accessibility grant. `AppDelegate` checks `LaunchEnvironment.isTestHost()` and returns before login-item registration, native capture, the permission prompt and the observer. Without this guard, every test run polls Claude and Outlook beside the installed app. It can then write to `capture.db` and to Memtime's `core.db`. `LaunchEnvironmentTests.test_isTestHost_inThisTestRun` fails if Xcode stops setting `XCTestConfigurationFilePath`.
+
 **Accessibility permission:** Requires Privacy & Security → Accessibility permission. Without it, `AXIsProcessTrusted()` returns false and all AX calls silently fail — no errors, just `nil` results.
 
 **CF ownership:** Use `takeUnretainedValue()` (not `takeRetainedValue()`) for `kAXTrustedCheckOptionPrompt` — it is a `+0` global constant.
@@ -129,7 +132,7 @@ Data flow: every 1s, `WorkspaceObserver` first reconciles its tracked PIDs again
 
 **Segments from one engine never overlap:** `SegmentBuilder` keeps a monotone start floor, so a backwards clock or an interrupt stamped before the last sample can never start a segment before the previous one ended. Do not reset the floor to an earlier time; that reintroduces double-counted time.
 
-**Single writer to capture.db:** `capture.lock` beside `capture.db` is flock'd (`O_CLOEXEC`) for the process lifetime, and capture is skipped under XCTest (`XCTestConfigurationFilePath`). A second writer would recover the live checkpoint at start and duplicate billable time. The Memtime writer (`WorkspaceObserver`) is skipped under XCTest too, so the test host never writes `core.db`.
+**Single writer to capture.db:** `capture.lock` beside `capture.db` is flock'd (`O_CLOEXEC`) for the process lifetime. The test host does not start capture or the Memtime writer (see **Test host skips start-up**). A second writer would recover the live checkpoint at start and duplicate billable time.
 
 **Checkpoint discipline:** `CaptureStore.insert` deletes the checkpoint row. The engine therefore re-checkpoints the open segment after every successful insert, and never writes `checkpoint(nil)` while segments are queued in `pending`. Dropping either breaks the "a crash loses 30 s at most" bound.
 
