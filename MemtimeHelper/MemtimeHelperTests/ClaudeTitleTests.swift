@@ -219,4 +219,90 @@ final class ClaudeTitleTests: XCTestCase {
         XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXHeading", title: "Pinned")))
         XCTAssertFalse(ClaudeTitle.isAnchor(FakeAXNode(role: "AXToolbar", title: "Formatting")))
     }
+
+    // MARK: - Chat and Cowork (Claude 5, Nov 2026)
+
+    /// Chat and Cowork conversations have no "Session tools" toolbar. The
+    /// header is a "Page tools" toolbar whose button desc is
+    /// "{title}, rename chat" (AX dumps of 2026-11-25).
+    func test_isAnchor_acceptsRenameChatButton() {
+        XCTAssertTrue(ClaudeTitle.isAnchor(
+            FakeAXNode(role: "AXButton", desc: "Test for Timesheet Helper, rename chat")))
+    }
+
+    func test_extract_titleFromRenameChatButtonDesc() {
+        let button = FakeAXNode(role: "AXButton", desc: "Test for Timesheet Helper, rename chat")
+        XCTAssertEqual(ClaudeTitle.extract(fromAnchor: button), "Test for Timesheet Helper")
+    }
+
+    func test_extract_returnsNil_whenRenameChatTitleIsEmpty() {
+        XCTAssertNil(ClaudeTitle.extract(fromAnchor: FakeAXNode(role: "AXButton", desc: ", rename chat")))
+    }
+
+    // MARK: - Page title fallback
+
+    /// The window holds two web areas: an untitled one for the sidebar and a
+    /// titled one, "{conversation} - Claude", for the page. The depth matches
+    /// the 2026-11-25 dumps: the titled web area is 7 levels below the window.
+    private func makeWindow(pageTitle: String?, artifactTitle: String? = nil) -> FakeAXNode {
+        let page = FakeAXNode(role: "AXWebArea", title: pageTitle)
+        if let artifactTitle {
+            page.adding(FakeAXNode(role: "AXGroup").adding(
+                FakeAXNode(role: "AXWebArea", title: artifactTitle)))
+        }
+        return FakeAXNode(role: "AXWindow", title: "Claude").adding(
+            FakeAXNode(role: "AXGroup", title: "Claude").adding(
+                FakeAXNode(role: "AXGroup").adding(
+                    FakeAXNode(role: "AXGroup").adding(
+                        FakeAXNode(role: "AXGroup").adding(
+                            FakeAXNode(role: "AXGroup").adding(
+                                FakeAXNode(role: "AXGroup").adding(
+                                    FakeAXNode(role: "AXScrollArea").adding(
+                                        FakeAXNode(role: "AXWebArea")))),
+                            FakeAXNode(role: "AXGroup").adding(
+                                FakeAXNode(role: "AXGroup").adding(
+                                    FakeAXNode(role: "AXScrollArea").adding(page))))))))
+    }
+
+    func test_pageTitle_stripsTheClaudeSuffix() {
+        let window = makeWindow(pageTitle: "Test for Timesheet Helper - Claude")
+        XCTAssertEqual(ClaudeTitle.pageTitle(inWindow: window), "Test for Timesheet Helper")
+    }
+
+    func test_pageTitle_stripsTheClaudeCodeSuffix() {
+        let window = makeWindow(pageTitle: "State of the industry report - AB#26449 - Claude Code")
+        XCTAssertEqual(ClaudeTitle.pageTitle(inWindow: window), "State of the industry report - AB#26449")
+    }
+
+    /// An artifact page keeps its conversation's page title. The artifact's
+    /// own web area ("Work Journal") has no suffix and must not win.
+    func test_pageTitle_ignoresAnArtifactWebAreaInsideThePage() {
+        let window = makeWindow(pageTitle: "Review Paradiv and Agent Desktop - Claude",
+                                artifactTitle: "Work Journal")
+        XCTAssertEqual(ClaudeTitle.pageTitle(inWindow: window), "Review Paradiv and Agent Desktop")
+    }
+
+    /// Views that name no conversation must read as nil, so the window title
+    /// applies and the time stays visibly unattributed.
+    func test_pageTitle_returnsNil_forViewsThatNameNoConversation() {
+        for title in ["Claude", "Settings - Claude", "New chat - Claude", "New task - Claude",
+                      " - Claude", "Claude Code"] {
+            XCTAssertNil(ClaudeTitle.pageTitle(inWindow: makeWindow(pageTitle: title)), title)
+        }
+    }
+
+    func test_pageTitle_returnsNil_withoutATitledWebArea() {
+        XCTAssertNil(ClaudeTitle.pageTitle(inWindow: makeWindow(pageTitle: nil)))
+    }
+
+    /// The search is depth-bounded so it never reads web areas deep inside
+    /// the conversation content.
+    func test_pageTitle_returnsNil_whenTheWebAreaIsTooDeep() {
+        var node = FakeAXNode(role: "AXWebArea", title: "Deep page - Claude")
+        let deep = node
+        for _ in 0..<12 { node = FakeAXNode(role: "AXGroup").adding(node) }
+        withExtendedLifetime(deep) {
+            XCTAssertNil(ClaudeTitle.pageTitle(inWindow: node))
+        }
+    }
 }

@@ -57,6 +57,12 @@ struct AXElementNode: AXNode {
 ///   - Nov 2026 (5.1231.2): the rename button is gone. The header is an
 ///     `AXToolbar desc="Session tools"`; that toolbar is the anchor, and the
 ///     title is the first `AXHeading` inside it.
+///   - Chat and Cowork (Claude 5): the header is an `AXToolbar desc="Page
+///     tools"`, and its button desc is "{title}, rename chat". That button is
+///     the anchor.
+///
+/// Views with no anchor (artifact pages, for example) fall back to
+/// `pageTitle(inWindow:)`: the page's web area is titled "{title} - Claude".
 ///
 /// For the "Session actions" anchor, walk up from the anchor and, at each
 /// ancestor, search its subtree for the first `AXButton` with a non-empty
@@ -66,7 +72,13 @@ struct AXElementNode: AXNode {
 /// Sidebar rows carry neither anchor. They have status-prefixed titles and
 /// "More options for {title}" popups.
 enum ClaudeTitle {
-    private static let renameSuffix = ", rename session"
+    private static let renameSuffixes = [", rename session", ", rename chat"]
+    private static let pageSuffixes = [" - Claude Code", " - Claude"]
+    /// Page titles that name a view, not a conversation.
+    private static let viewTitles: Set<String> = ["Settings", "New chat", "New task"]
+    /// The page web area sits 9 levels below the window in the 2026-11-25
+    /// dumps. The bound keeps the search out of conversation content.
+    private static let pageSearchDepth = 10
 
     static func isAnchor(_ node: AXNode) -> Bool {
         isSessionToolbar(node)
@@ -78,8 +90,9 @@ enum ClaudeTitle {
         if isSessionToolbar(anchor) {
             return firstHeadingTitle(in: anchor, maxDepth: 3)
         }
-        if isRenameButton(anchor), let desc = anchor.desc {
-            let title = String(desc.dropLast(renameSuffix.count))
+        if let desc = anchor.desc, anchor.role == "AXButton",
+           let suffix = renameSuffixes.first(where: { desc.hasSuffix($0) }) {
+            let title = String(desc.dropLast(suffix.count))
             return title.isEmpty ? nil : title
         }
 
@@ -96,11 +109,36 @@ enum ClaudeTitle {
     }
 
     private static func isRenameButton(_ node: AXNode) -> Bool {
-        node.role == "AXButton" && (node.desc?.hasSuffix(renameSuffix) ?? false)
+        guard node.role == "AXButton", let desc = node.desc else { return false }
+        return renameSuffixes.contains { desc.hasSuffix($0) }
     }
 
     private static func isSessionToolbar(_ node: AXNode) -> Bool {
         node.role == "AXToolbar" && (node.desc == "Session tools" || node.title == "Session tools")
+    }
+
+    /// The conversation named by the page title, "{title} - Claude". Used
+    /// when no pane anchor exists. Returns nil for views that name no
+    /// conversation, so the time stays visibly unattributed.
+    static func pageTitle(inWindow window: AXNode) -> String? {
+        guard let page = firstSuffixedWebAreaTitle(in: window, maxDepth: pageSearchDepth),
+              let suffix = pageSuffixes.first(where: { page.hasSuffix($0) }) else { return nil }
+        let title = String(page.dropLast(suffix.count)).trimmingCharacters(in: .whitespaces)
+        return title.isEmpty || viewTitles.contains(title) ? nil : title
+    }
+
+    private static func firstSuffixedWebAreaTitle(in node: AXNode, maxDepth: Int) -> String? {
+        if maxDepth < 0 { return nil }
+        if node.role == "AXWebArea", let title = node.title,
+           pageSuffixes.contains(where: { title.hasSuffix($0) }) {
+            return title
+        }
+        for child in node.children {
+            if let title = firstSuffixedWebAreaTitle(in: child, maxDepth: maxDepth - 1) {
+                return title
+            }
+        }
+        return nil
     }
 
     private static func firstHeadingTitle(in node: AXNode, maxDepth: Int) -> String? {

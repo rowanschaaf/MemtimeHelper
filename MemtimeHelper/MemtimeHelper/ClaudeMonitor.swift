@@ -30,7 +30,9 @@ final class ClaudeMonitor: AppMonitor {
         // ClaudeTitleTests). Run AXTreeDumper when the layout changes again.
         var anchors: [AXUIElement] = []
         collectAnchors(in: window, depth: 0, into: &anchors)
-        if anchors.isEmpty { return nil }
+        // Artifact pages and other views without a pane header still name
+        // their conversation in the page title.
+        if anchors.isEmpty { return ClaudeTitle.pageTitle(inWindow: AXElementNode(element: window)) }
 
         // With multiple conversation panes, prefer the one containing the
         // focused UI element — that's the pane the user is actively in.
