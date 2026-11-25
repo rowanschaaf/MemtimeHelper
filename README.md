@@ -44,7 +44,7 @@ The menu bar icon shows the health of native capture. If more than one state app
 - **Accessibility permission needed**: the permission is not yet granted. This shows only until the first capture sample. After that, Degraded reports the missing permission.
 - **App titles**: capture is healthy. The menu shows the title of each monitored app that is in use.
 
-Each Claude conversation pane has one anchor element, and the title is read relative to it. Claude 2.19675.0 anchors on the title button itself (`AXButton desc="{title}, rename session"`). Older versions used an `AXPopUpButton desc="Session actions"` popup. Claude changes this layout without notice. [CLAUDE.md](CLAUDE.md) records each layout and how to re-derive the anchor.
+Each Claude conversation pane has one anchor element, and the title is read relative to it. Claude 5 anchors on the `Session tools` toolbar in Code, and on the `{title}, rename chat` button in Chat and Cowork. Older versions used the `{title}, rename session` button or a `Session actions` popup. A view with no anchor, such as an artifact page, falls back to the page title, "{title} - Claude". Claude changes this layout without notice. [CLAUDE.md](CLAUDE.md) records each layout and how to re-derive the anchor.
 
 ## Requirements
 
